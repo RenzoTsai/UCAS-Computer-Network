@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-char * recv_msg_handler(char * server_reply, char * processed_msg);
+char * handle_recv_msg(char * server_reply, char * processed_msg);
  
 int main(int argc, char *argv[])
 {
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
         }
         fd = fopen(recv_path, "wb+");
         
-        if (recv_msg_handler(server_reply, processed_msg) != NULL) {
+        if (handle_recv_msg(server_reply, processed_msg) != NULL) {
             fwrite(processed_msg, 1, strlen(processed_msg), fd);
         } else {
             printf("save failed\n");
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-char * recv_msg_handler(char * server_reply, char * processed_msg) {
+char * handle_recv_msg(char * server_reply, char * processed_msg) {
     int cursor = 0;
     int flag = 0;
     

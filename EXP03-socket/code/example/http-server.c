@@ -4,16 +4,16 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 int msg_handler(char * msg, char * path);
+void * handle_request(void * cs);
 
 int main(int argc, const char *argv[])
 {
-    int s, cs;
+    int s;
     struct sockaddr_in server, client;
-    char msg[2000];
-    char * send_msg_buffer;
-     
+
     // create socket
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("create socket failed");
@@ -39,14 +39,53 @@ int main(int argc, const char *argv[])
      
     // accept connection from an incoming client
     int c = sizeof(struct sockaddr_in);
-    if ((cs = accept(s, (struct sockaddr *)&client, (socklen_t *)&c)) < 0) {
-        perror("accept failed");
-        return -1;
-    }
-    printf("connection accepted\n");
+    while(1) {
+        int cs;
+        pthread_t thread1;
+        if ((cs = accept(s, (struct sockaddr *)&client, (socklen_t *)&c)) < 0) {
+            perror("accept failed");
+            return -1;
+        }
+        // handle_request(&cs1);
+        pthread_create(&thread1, NULL, handle_request, &cs);
+        // pthread_create(&thread2, NULL, handle_request, &cs2);
 
-	int msg_len = 0;
+        pthread_detach(thread1);
+        //pthread_join(thread1, NULL);
+    }
+
+ 
+    return 0;
+}
+
+/* parse file path */
+int msg_handler(char * msg, char * path) {
+    int i = 0;
+    int j = 0;
+
+    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
+    }
+    i++;
+    if (msg[i]=='/') {
+        i++;
+    }
+
+    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
+        path[j] = msg[i];
+        j++;
+    }
+
+    path[j] = '\0';
+    return 1;
+}
+
+void * handle_request(void * csock) {
+    int cs = *(int *)csock;
+    printf("connection accepted\n");
     // receive a message from client
+    char msg[2000];
+    int msg_len = 0;
+    char * send_msg_buffer;
     while ((msg_len = recv(cs, msg, sizeof(msg), 0)) > 0) {
         // send the message back to client
         char path[50];              //target file path
@@ -97,29 +136,7 @@ int main(int argc, const char *argv[])
     }
     else { // msg_len < 0
         perror("recv failed");
-		return -1;
+		exit(-1);
     }
-     
-    return 0;
-}
-
-/* parse file path */
-int msg_handler(char * msg, char * path) {
-    int i = 0;
-    int j = 0;
-
-    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
-    }
-    i++;
-    if (msg[i]=='/') {
-        i++;
-    }
-
-    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
-        path[j] = msg[i];
-        j++;
-    }
-
-    path[j] = '\0';
-    return 1;
+    exit(0);
 }
