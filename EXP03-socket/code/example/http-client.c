@@ -52,10 +52,10 @@ int main(int argc, char *argv[])
         strcat(message, " HTTP/1.1\r\n");
         strcat(message, "Accept: */*\r\n"); 
         // strcat(message, "Accept-Encoding: identity\r\n"); 
-        // strcat(message, "Host: 127.0.0.1\n"); // HTTP 1.1 needs to add host.
-        // strcat(message, "Connection: Keep-Alive\r\n");
+        strcat(message, "Host: 127.0.0.1\n"); // HTTP 1.1 needs to add host.
+        strcat(message, "Connection: Keep-Alive\r\n");
         strcat(message, "\r\n");
-        //strcat(message, "\r\n");
+        strcat(message, "\r\n");
         //strcat(message, "\r\n");
 
         printf("send msg: %s\n", message);
