@@ -12,7 +12,7 @@ void * handle_request(void * cs);
 int main(int argc, const char *argv[])
 {
     int s;
-    struct sockaddr_in server, client;
+    struct sockaddr_in server;
 
     // create socket
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -36,24 +36,13 @@ int main(int argc, const char *argv[])
     // listen
     listen(s, 128);
     printf("waiting for incoming connections...");
-     
-    // accept connection from an incoming client
-    int c = sizeof(struct sockaddr_in);
+    
+    // use pthread to support multi-request
     while(1) {
-        int cs;
-        pthread_t thread1;
-        if ((cs = accept(s, (struct sockaddr *)&client, (socklen_t *)&c)) < 0) {
-            perror("accept failed");
-            return -1;
-        }
-        // handle_request(&cs1);
-        pthread_create(&thread1, NULL, handle_request, &cs);
-        // pthread_create(&thread2, NULL, handle_request, &cs2);
-
-        pthread_detach(thread1);
-        //pthread_join(thread1, NULL);
+        pthread_t thread;
+        pthread_create(&thread, NULL, handle_request, &s);
+        pthread_join(thread, NULL);
     }
-
  
     return 0;
 }
@@ -79,16 +68,28 @@ int msg_handler(char * msg, char * path) {
     return 1;
 }
 
-void * handle_request(void * csock) {
-    int cs = *(int *)csock;
+void * handle_request(void * s_in) {
+    int cs;
+    
+    // accept connection from an incoming client
+    struct sockaddr_in client;
+    int c = sizeof(struct sockaddr_in);
+    int s = *(int *)s_in;
+
+    if ((cs = accept(s, (struct sockaddr *)&client, (socklen_t *)&c)) < 0) {
+        perror("accept failed");
+        exit(-1);
+    }
+
     printf("connection accepted\n");
     // receive a message from client
     char msg[2000];
     int msg_len = 0;
     char * send_msg_buffer;
     while ((msg_len = recv(cs, msg, sizeof(msg), 0)) > 0) {
+
         // send the message back to client
-        char path[50];              //target file path
+        char path[50];                          //target file path
         bzero(path, sizeof(path));
 
         printf("%s\n",msg);
@@ -114,7 +115,6 @@ void * handle_request(void * csock) {
 
             /*add http head */
             strcat(return_message, "200 OK\r\n"); 
-            //strcat(return_message, "Content-Type: text/plain\r\n");
             strcat(return_message, "Content-Length: ");
             sprintf(file_len_string,"%d", file_length);
             strcat(return_message, file_len_string);
@@ -135,7 +135,7 @@ void * handle_request(void * csock) {
         printf("client disconnected");
     }
     else { // msg_len < 0
-        perror("recv failed");
+        perror("detect multi-request(in wget)");
 		exit(-1);
     }
     exit(0);

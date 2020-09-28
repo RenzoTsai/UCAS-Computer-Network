@@ -40,25 +40,27 @@ int main(int argc, char *argv[])
         char recv_path[35] = "recv_";
         
         FILE * fd;
-        char processed_msg[2000];
+        char processed_msg[200];
 
         printf("enter message : ");
         scanf("%s", path);
+        getchar();
         strcat(recv_path,path);
 
         bzero(message, sizeof(message));
         strcat(message, "GET /");
         strcat(message, path);
         strcat(message, " HTTP/1.1\r\n");
+        //strcat(message, "User-Agent: Wget/1.17.1 (linux-gnu\r\n");
         strcat(message, "Accept: */*\r\n"); 
-        // strcat(message, "Accept-Encoding: identity\r\n"); 
-        strcat(message, "Host: 127.0.0.1\n"); // HTTP 1.1 needs to add host.
+        strcat(message, "Accept-Encoding: identity\r\n"); 
+        strcat(message, "Host: 10.0.0.1\r\n"); // HTTP 1.1 needs to add host.
         strcat(message, "Connection: Keep-Alive\r\n");
         strcat(message, "\r\n");
-        strcat(message, "\r\n");
-        //strcat(message, "\r\n");
+        // strcat(message, "\r\n");
+        // strcat(message, "\r\n");
 
-        printf("send msg: %s\n", message);
+        printf("send msg:\n%s\n", message);
         
         // send some data
         if (send(sock, message, strlen(message), 0) < 0) {
@@ -73,10 +75,11 @@ int main(int argc, char *argv[])
             break;
         }
 		server_reply[len] = 0;
-        printf("server reply : ");
+        printf("len : %d \nserver reply : ", len);
         printf("%s\n", server_reply);
 
         if(strstr(server_reply, "404 Not Found")){
+            printf("HTTP 404 Not Found\n");
             continue;
         }
         fd = fopen(recv_path, "wb+");
