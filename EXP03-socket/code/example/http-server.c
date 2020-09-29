@@ -41,7 +41,7 @@ int main(int argc, const char *argv[])
     while(1) {
         pthread_t thread;
         pthread_create(&thread, NULL, handle_request, &s);
-        pthread_join(thread, NULL);
+        pthread_detach(thread);
     }
  
     return 0;

@@ -8,6 +8,13 @@
 #include <stdlib.h>
 
 char * handle_recv_msg(char * server_reply, char * processed_msg);
+
+char request_head[] = 
+    " HTTP/1.1\r\n"
+    "Accept: */*\r\n"
+    "Accept-Encoding: identity\r\n"
+    "Host: 10.0.0.1\r\n"
+    "Connection: Keep-Alive\r\n\r\n";
  
 int main(int argc, char *argv[])
 {
@@ -36,30 +43,23 @@ int main(int argc, char *argv[])
     printf("connected\n");
      
     while(1) {
-        char path[30];
-        char recv_path[35] = "recv_";
+        char path[50];
+        char recv_path[55] = "recv_";
         
         FILE * fd;
         char processed_msg[200];
 
+        memset(path, 0, sizeof(path));
         printf("enter message : ");
         scanf("%s", path);
-        getchar();
         strcat(recv_path,path);
 
-        bzero(message, sizeof(message));
-        bzero(server_reply, 2000);
-        strcat(message, "GET /");
+        memset(message, 0, sizeof(message));
+        memset(server_reply, 0, sizeof(server_reply));
+        
+        strcpy(message, "GET /");
         strcat(message, path);
-        strcat(message, " HTTP/1.1\r\n");
-        //strcat(message, "User-Agent: Wget/1.17.1 (linux-gnu\r\n");
-        strcat(message, "Accept: */*\r\n"); 
-        strcat(message, "Accept-Encoding: identity\r\n"); 
-        strcat(message, "Host: 10.0.0.1\r\n"); // HTTP 1.1 needs to add host.
-        strcat(message, "Connection: Keep-Alive\r\n");
-        strcat(message, "\r\n");
-        // strcat(message, "\r\n");
-        // strcat(message, "\r\n");
+        strcat(message, request_head);
 
         printf("send msg:\n%s\n", message);
         
@@ -71,11 +71,12 @@ int main(int argc, char *argv[])
          
         // receive a reply from the server
 		int len = recv(sock, server_reply, 2000, 0);
-        if (len < 0) {
+        if (len <= 0) {
             printf("recv failed");
             break;
         }
 		server_reply[len] = 0;
+
         printf("len : %d \n server reply : ", len);
         printf("%s\n", server_reply);
 
@@ -83,6 +84,7 @@ int main(int argc, char *argv[])
             printf("HTTP 404 Not Found\n");
             continue;
         }
+
         fd = fopen(recv_path, "wb+");
         
         if (handle_recv_msg(server_reply, processed_msg) != NULL) {
@@ -98,9 +100,18 @@ int main(int argc, char *argv[])
 
 
         fclose(fd);
+
+
+        /* The following part used depends on whether uses SimpleHttpServer. 
+        If you want to use SimpleHttpServer, you should enable this part
+        because SimpleHttpServer will send TCP RST signal after once connection.
+        */ 
+
+        /* 
         close(sock);
         sock = socket(AF_INET, SOCK_STREAM, 0);
         connect(sock, (struct sockaddr *)&server, sizeof(server));
+        */
 
     }
      
