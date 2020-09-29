@@ -4,16 +4,16 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 int msg_handler(char * msg, char * path);
+void * handle_request(void * cs);
 
 int main(int argc, const char *argv[])
 {
-    int s, cs;
-    struct sockaddr_in server, client;
-    char msg[2000];
-    char * send_msg_buffer;
-     
+    int s;
+    struct sockaddr_in server;
+
     // create socket
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("create socket failed");
@@ -36,20 +36,60 @@ int main(int argc, const char *argv[])
     // listen
     listen(s, 128);
     printf("waiting for incoming connections...");
-     
+    
+    // use pthread to support multi-request
+    while(1) {
+        pthread_t thread;
+        pthread_create(&thread, NULL, handle_request, &s);
+        pthread_detach(thread);
+    }
+ 
+    return 0;
+}
+
+/* parse file path */
+int msg_handler(char * msg, char * path) {
+    int i = 0;
+    int j = 0;
+
+    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
+    }
+    i++;
+    if (msg[i]=='/') {
+        i++;
+    }
+
+    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
+        path[j] = msg[i];
+        j++;
+    }
+
+    path[j] = '\0';
+    return 1;
+}
+
+void * handle_request(void * s_in) {
+    int cs;
+    
     // accept connection from an incoming client
+    struct sockaddr_in client;
     int c = sizeof(struct sockaddr_in);
+    int s = *(int *)s_in;
+
     if ((cs = accept(s, (struct sockaddr *)&client, (socklen_t *)&c)) < 0) {
         perror("accept failed");
-        return -1;
+        exit(-1);
     }
-    printf("connection accepted\n");
 
-	int msg_len = 0;
+    printf("connection accepted\n");
     // receive a message from client
+    char msg[2000];
+    int msg_len = 0;
+    char * send_msg_buffer;
     while ((msg_len = recv(cs, msg, sizeof(msg), 0)) > 0) {
+
         // send the message back to client
-        char path[50];              //target file path
+        char path[50];                          //target file path
         bzero(path, sizeof(path));
 
         printf("%s\n",msg);
@@ -75,7 +115,6 @@ int main(int argc, const char *argv[])
 
             /*add http head */
             strcat(return_message, "200 OK\r\n"); 
-            //strcat(return_message, "Content-Type: text/plain\r\n");
             strcat(return_message, "Content-Length: ");
             sprintf(file_len_string,"%d", file_length);
             strcat(return_message, file_len_string);
@@ -96,30 +135,8 @@ int main(int argc, const char *argv[])
         printf("client disconnected");
     }
     else { // msg_len < 0
-        perror("recv failed");
-		return -1;
+        perror("detect multi-request(in wget)");
+		exit(-1);
     }
-     
-    return 0;
-}
-
-/* parse file path */
-int msg_handler(char * msg, char * path) {
-    int i = 0;
-    int j = 0;
-
-    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
-    }
-    i++;
-    if (msg[i]=='/') {
-        i++;
-    }
-
-    for ( ; i < strlen(msg) && msg[i] != ' '; i++) {
-        path[j] = msg[i];
-        j++;
-    }
-
-    path[j] = '\0';
-    return 1;
+    exit(0);
 }
