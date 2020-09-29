@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
         strcat(recv_path,path);
 
         bzero(message, sizeof(message));
+        bzero(server_reply, 2000);
         strcat(message, "GET /");
         strcat(message, path);
         strcat(message, " HTTP/1.1\r\n");
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
             break;
         }
 		server_reply[len] = 0;
-        printf("len : %d \nserver reply : ", len);
+        printf("len : %d \n server reply : ", len);
         printf("%s\n", server_reply);
 
         if(strstr(server_reply, "404 Not Found")){
@@ -97,6 +98,10 @@ int main(int argc, char *argv[])
 
 
         fclose(fd);
+        close(sock);
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        connect(sock, (struct sockaddr *)&server, sizeof(server));
+
     }
      
     close(sock);
