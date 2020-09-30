@@ -4,7 +4,7 @@
 
 [蔡润泽](https://github.com/RenzoTsai)
 
-[本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP03-socket)
+[本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP03-Socket_HTTP)
 
 ## 实验内容
 
