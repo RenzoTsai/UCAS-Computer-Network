@@ -1,8 +1,8 @@
 # HTTP服务器/客户端实验
 
-[蔡润泽](https://github.com/RenzoTsai)
-
 2020年9月29日
+
+[蔡润泽](https://github.com/RenzoTsai)
 
 [本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP03-socket)
 
@@ -25,12 +25,15 @@
 1、已有代码框架已经能实现socket下的echo，而实现HTTP client和server首先要做的是实现HTTP GET请求与相应。
 
 2、在查询`HTTP GET`请求格式后，了解到`GET`请求报文格式如下图：
-![HTTP-request](/EXP03-socket/assets/HTTP-request.png)
+
+![HTTP-request](https://github.com/RenzoTsai/UCAS-Computer-Network/blob/master/EXP03-socket/assets/HTTP-request.png?raw=true)
 
 因此，本设计在 `http-client.c` 文件里添加了字符串`request_head`来生成请求报文，并在程序运行时通过`scanf`获得用户输入的请求文件路径。在加上请求头部后，`Client`将请求发送给`Server`。
 
 3、`Server` 在收到 `HTTP GET` 请求格式后，了解到响应报文格式如下图：
- ![HTTP-reply](/EXP03-socket/assets/HTTP-reply.png)
+
+ ![HTTP-reply](https://github.com/RenzoTsai/UCAS-Computer-Network/blob/master/EXP03-socket/assets/HTTP-reply.png?raw=true)
+
 因此，本设计在 `http-server.c` 文件里添加了 `int msg_handler(char * msg, char * path)` 函数来解析请求报文，并提取出请求文件的地址。
 
 4、`Server` 在打开目标文件后，读取目标文件的内容，并将内容传递至 `return_message`，`return_message` 此外还会附上必要的响应头部属性最后`Server` 会将`return_message`发送给`Client`。
