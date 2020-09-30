@@ -6,4 +6,4 @@ This is a repo for UCAS Computer Network Experiment.
 
 Set up environment for Mininet.
 
-### EXP03-Socket_HTPP
+### EXP03-Socket_HTTP
