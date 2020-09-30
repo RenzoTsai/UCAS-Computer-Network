@@ -26,13 +26,13 @@
 
 2、在查询`HTTP GET`请求格式后，了解到`GET`请求报文格式如下图：
 
-![HTTP-request](https://github.com/RenzoTsai/UCAS-Computer-Network/blob/master/EXP03-socket/assets/HTTP-request.png?raw=true)
+![HTTP-request](/EXP03-Socket_HTTP/assets/HTTP-request.png)
 
 因此，本设计在 `http-client.c` 文件里添加了字符串`request_head`来生成请求报文，并在程序运行时通过`scanf`获得用户输入的请求文件路径。在加上请求头部后，`Client`将请求发送给`Server`。
 
 3、`Server` 在收到 `HTTP GET` 请求格式后，了解到响应报文格式如下图：
 
- ![HTTP-reply](https://github.com/RenzoTsai/UCAS-Computer-Network/blob/master/EXP03-socket/assets/HTTP-reply.png?raw=true)
+ ![HTTP-reply](/EXP03-Socket_HTTP/assets/HTTP-reply.png)
 
 因此，本设计在 `http-server.c` 文件里添加了 `int msg_handler(char * msg, char * path)` 函数来解析请求报文，并提取出请求文件的地址。
 
@@ -58,7 +58,7 @@
 
 本客户端通过与 `SimpleHTTPServer` 建立连接来测试客户端连续多次获得文件的能力，如下图：
 
-![myclient-get-multi-files](/EXP03-socket/assets/myclient-get-multi-files.png)
+![myclient-get-multi-files](/EXP03-Socket_HTTP/assets/myclient-get-multi-files.png)
 
 左侧 `Xterm` 界面显示了 `Client` 接收文件的反馈。`Client` 在控制台打印输出了请求的内容和相应的内容。
 
@@ -66,13 +66,13 @@
 
 `1.txt` 里的内容为 `crz is great 1`，`2.txt` 不存在，`3.txt`里的内容为 `crz is great`。 左边输出内容代表三个请求均反馈正确，且正常收取了 `1.txt` 和 `3.txt` 两个文件。接收的文件名在原文件名前增加 `recv_` ，如下图：
 
-![myclient-recv-files](/EXP03-socket/assets/myclient-recv-files.jpg)
+![myclient-recv-files](/EXP03-Socket_HTTP/assets/myclient-recv-files.jpg)
 
 #### 同时启动多个客户端进程分别获取文件
 
 通过 `pthread` 支持多线程多路并发，本设计支持同时启动多个客户端进程分别获取文件，具体的测试实现是借助 `wget 10.0.0.1/1.txt & wget 10.0.0.1/3.txt` 实现两个 `wget` 指令同时请求，测试结果如下：
 
-![myserver-send-multi-files](/EXP03-socket/assets/myserver-send-multi-files.jpg)
+![myserver-send-multi-files](/EXP03-Socket_HTTP/assets/myserver-send-multi-files.jpg)
 
 由图可知， `1.txt` 和 `3.txt` 均被顺利接收。
 
@@ -82,7 +82,7 @@
 
 即多个`Client` 向 `Server`发送请求。结果如下：
 
-![myserver-to-myclient](/EXP03-socket/assets/myserver-to-myclient.jpg)
+![myserver-to-myclient](/EXP03-Socket_HTTP/assets/myserver-to-myclient.jpg)
 
 ## 遇到的问题
 
