@@ -7,3 +7,5 @@ This is a repo for UCAS Computer Network Experiment.
 Set up environment for Mininet.
 
 ### EXP03-Socket_HTTP
+
+Use socket to build a http server and client.
