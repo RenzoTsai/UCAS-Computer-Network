@@ -92,8 +92,7 @@ void broadcast_packet(iface_info_t *iface, const char *packet, int len)
 
 而在拓扑文件中，`h1 -> b1`的带宽为`20Mbps`，`b1 -> h2` 的带宽为`10Mbps`,`b1 -> h3` 的带宽为`10Mbps`。因此带宽的利用率为`34.05%`。
 
-###### `h1`: `iperf server`; `h2`,`h3`: `iperf client`：
-
+###### `h1`: `iperf server`; `h2`,`h3`: `iperf client`:
 
 ![h1_exp04_1_server_iperf](/EXP04-Boardcast_Net/assets/h1_exp04_1_server_iperf.jpg)
 
