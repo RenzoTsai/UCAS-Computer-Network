@@ -50,11 +50,10 @@ iface_info_t *lookup_port(u8 mac[ETH_ALEN])
 {
 	// TODO: implement the lookup process here
 	//fprintf(stdout, "TODO: implement the lookup process here.\n");
-
+	pthread_mutex_lock(&mac_port_map.lock);
 	u8 hash_value = hash8((char *)mac, ETH_ALEN);
 	mac_port_entry_t * mac_port_entry_pos = NULL;
 	
-	pthread_mutex_lock(&mac_port_map.lock);
 	list_for_each_entry(mac_port_entry_pos, &mac_port_map.hash_table[hash_value], list) {
 		if (mac_cmp(mac_port_entry_pos->mac, mac, ETH_ALEN) == 0) {
 			mac_port_entry_pos->visited = time(NULL);
@@ -80,6 +79,7 @@ void insert_mac_port(u8 mac[ETH_ALEN], iface_info_t *iface)
 {
 	// TODO: implement the insertion process here
 	// fprintf(stdout, "TODO: implement the insertion process here.\n");
+	pthread_mutex_lock(&mac_port_map.lock);
 	mac_port_entry_t * new_mac_port_entry = safe_malloc(sizeof(mac_port_entry_t));
 	bzero(new_mac_port_entry, sizeof(mac_port_entry_t));
 	mac_cpy(new_mac_port_entry->mac, mac, ETH_ALEN);
@@ -87,6 +87,7 @@ void insert_mac_port(u8 mac[ETH_ALEN], iface_info_t *iface)
 	new_mac_port_entry->visited = time(NULL);
 	u8 hash_value = hash8((char *)mac, ETH_ALEN);
 	list_add_tail(&new_mac_port_entry->list, &mac_port_map.hash_table[hash_value]);
+	pthread_mutex_unlock(&mac_port_map.lock);
 }
 
 // dumping mac_port table

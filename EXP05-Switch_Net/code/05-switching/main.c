@@ -50,7 +50,7 @@ void handle_packet(iface_info_t *iface, char *packet, int len)
 		broadcast_packet(iface, packet, len);
 	}
 
-	if (lookup_port(eh->ether_dhost) == NULL) {
+	if (lookup_port(eh->ether_shost) == NULL) {
 		insert_mac_port(eh->ether_shost, iface);
 	}
 	
