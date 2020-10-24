@@ -217,20 +217,26 @@ void update_root(stp_t *stp, struct stp_config *config) {
 			num_non_ports ++;
 		}
 	}
+	printf("num:%d\n",num_non_ports);
 	int judge = 0;
-	for(int i = 0; i < num_non_ports - 1; i++) {
-		if (judge == 0) {
-			if(!compare_ports_pirority(non_designated_ports[i], non_designated_ports[i+1])) {
-				stp->root_port = non_designated_ports[i];
-				judge = 1;
-			}
-		} else {
-			if(!compare_ports_pirority(non_designated_ports[i], stp->root_port)) {
-				stp->root_port = non_designated_ports[i];
-			}
-		}		
+	if (num_non_ports == 1) {
+		stp->root_port = non_designated_ports[0];
+	} else {
+		for(int i = 0; i < num_non_ports -1; i++) {
+			if (judge == 0) {
+				if(!compare_ports_pirority(non_designated_ports[i], non_designated_ports[i+1])) {
+					stp->root_port = non_designated_ports[i];
+					judge = 1;
+				}
+			} else {
+				if(!compare_ports_pirority(non_designated_ports[i], stp->root_port)) {
+					stp->root_port = non_designated_ports[i];
+				}
+			}		
+		}
 	}
-	if (stp->root_port != NULL) {
+
+	if (stp->root_port == NULL) {
 		stp->designated_root = stp->switch_id;
 		stp->root_path_cost = 0;
 	} else {
@@ -239,16 +245,13 @@ void update_root(stp_t *stp, struct stp_config *config) {
 	}
 }
 
-void update_other_ports() {
-	stp_port_t * non_designated_ports[STP_MAX_PORTS];
-	int num_non_des_ports = 0; 
+void update_other_ports(stp_t *stp) {
 	for (int i =0 ; i < stp->nports; i++) {
-		if(!stp_port_is_designated(&stp->ports[i])) {
-			non_designated_ports[num_non_des_ports] = &stp->ports[i];
+		if(stp_port_is_designated(&stp->ports[i])) {
+			stp->ports[i].designated_root = stp->designated_root;
+			stp->ports[i].designated_cost = stp->root_path_cost;
 		}
 	}
-
-
 }
 
 static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
@@ -258,8 +261,9 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 	fprintf(stdout, "TODO: handle config packet here.\n");
 	if (recv_has_higher_pirority(p, config)) {
 		update_port_config(p, config);
-		//update_root(stp, config);	
-		stp_stop_timer(&stp->hello_timer);
+		update_root(stp, config);
+		update_other_ports(stp);	
+		//stp_stop_timer(&stp->hello_timer);
 	} 
 }
 
