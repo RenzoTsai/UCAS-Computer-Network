@@ -217,7 +217,6 @@ void update_root(stp_t *stp, struct stp_config *config) {
 			num_non_ports ++;
 		}
 	}
-	printf("num:%d\n",num_non_ports);
 	int judge = 0;
 	if (num_non_ports == 1) {
 		stp->root_port = non_designated_ports[0];
@@ -262,8 +261,7 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 	if (recv_has_higher_pirority(p, config)) {
 		update_port_config(p, config);
 		update_root(stp, config);
-		update_other_ports(stp);	
-		//stp_stop_timer(&stp->hello_timer);
+		update_other_ports(stp);
 	} 
 }
 
