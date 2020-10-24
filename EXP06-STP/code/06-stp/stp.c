@@ -139,11 +139,128 @@ void *stp_timer_routine(void *arg)
 	return NULL;
 }
 
+//return 0 when stp has higher pirority and return 1 when recv config has higher pirority
+int recv_has_higher_pirority(stp_port_t * p, struct stp_config *config) {
+	if (p->designated_root != ntohll(config->root_id)) {
+		if(p->designated_root < ntohll(config->root_id)) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else if (p->designated_cost != ntohl(config->root_path_cost)) {
+		if (p->designated_cost < ntohl(config->root_path_cost)) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else if (p->designated_switch != ntohll(config->switch_id)) {
+		if (p->designated_switch < ntohll(config->switch_id)) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else if (p->designated_port != ntohs(config->port_id)) {
+		if (p->designated_port < ntohs(config->port_id)) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else {
+		return 1;
+	}
+}
+
+//return 0 when p1 has higher pirority and return 1 when p2 has higher pirority
+int compare_ports_pirority(stp_port_t * p1, stp_port_t * p2) {
+	if (p1->designated_root != p2->designated_root) {
+		if(p1->designated_root < p2->designated_root) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else if (p1->designated_cost != p2->designated_cost) {
+		if (p1->designated_cost < p2->designated_cost) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else if (p1->designated_switch != p2->designated_switch) {
+		if (p1->designated_switch < p2->designated_switch) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else if (p1->designated_port != p2->designated_port) {
+		if (p1->designated_port < p2->designated_port) {
+			return 0;
+		} else {
+			return 1;
+		}
+	} else {
+		return 1;
+	}
+}
+
+void update_port_config(stp_port_t *p, struct stp_config *config) {
+	p->designated_root = ntohll(config->root_id);
+	p->designated_switch = ntohll(config->switch_id);
+	p->designated_port = ntohs(config->port_id);
+	p->designated_cost = ntohl(config->root_path_cost);
+}
+
+void update_root(stp_t *stp, struct stp_config *config) {
+	stp_port_t * non_designated_ports[STP_MAX_PORTS];
+	int num_non_ports = 0; 
+	for (int i =0 ; i < stp->nports; i++) {
+		if(!stp_port_is_designated(&stp->ports[i])) {
+			non_designated_ports[num_non_ports] = &stp->ports[i];
+			num_non_ports ++;
+		}
+	}
+	int judge = 0;
+	for(int i = 0; i < num_non_ports - 1; i++) {
+		if (judge == 0) {
+			if(!compare_ports_pirority(non_designated_ports[i], non_designated_ports[i+1])) {
+				stp->root_port = non_designated_ports[i];
+				judge = 1;
+			}
+		} else {
+			if(!compare_ports_pirority(non_designated_ports[i], stp->root_port)) {
+				stp->root_port = non_designated_ports[i];
+			}
+		}		
+	}
+	if (stp->root_port != NULL) {
+		stp->designated_root = stp->switch_id;
+		stp->root_path_cost = 0;
+	} else {
+		stp->designated_root = stp->root_port->designated_root;
+		stp->root_path_cost = stp->root_port->designated_cost + stp->root_port->path_cost;
+	}
+}
+
+void update_other_ports() {
+	stp_port_t * non_designated_ports[STP_MAX_PORTS];
+	int num_non_des_ports = 0; 
+	for (int i =0 ; i < stp->nports; i++) {
+		if(!stp_port_is_designated(&stp->ports[i])) {
+			non_designated_ports[num_non_des_ports] = &stp->ports[i];
+		}
+	}
+
+
+}
+
 static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 		struct stp_config *config)
 {
 	// TODO: handle config packet here
 	fprintf(stdout, "TODO: handle config packet here.\n");
+	if (recv_has_higher_pirority(p, config)) {
+		update_port_config(p, config);
+		//update_root(stp, config);	
+		stp_stop_timer(&stp->hello_timer);
+	} 
 }
 
 static void *stp_dump_state(void *arg)
