@@ -262,6 +262,10 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 		update_port_config(p, config);
 		update_root(stp, config);
 		update_other_ports(stp);
+		if(!stp_is_root_switch(stp)) {
+			stp_stop_timer(&stp->hello_timer);
+			stp_send_config(stp);
+		}
 	} 
 }
 
