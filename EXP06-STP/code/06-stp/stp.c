@@ -257,7 +257,7 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 		struct stp_config *config)
 {
 	// TODO: handle config packet here
-	fprintf(stdout, "TODO: handle config packet here.\n");
+	// fprintf(stdout, "TODO: handle config packet here.\n");
 	if (recv_has_higher_pirority(p, config)) {
 		update_port_config(p, config);
 		update_root(stp, config);
