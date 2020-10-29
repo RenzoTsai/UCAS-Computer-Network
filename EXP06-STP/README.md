@@ -210,6 +210,6 @@ void update_other_ports(stp_t *stp) {
 
 根据比对，本设计的结果与reference的结果相同，即实验成功。
 
-#### 七节点STP生成的结果
+#### 7节点STP生成的结果
 
 ![topo](/EXP06-STP/assets/topo.png)
