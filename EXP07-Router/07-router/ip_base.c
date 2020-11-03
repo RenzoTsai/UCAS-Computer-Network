@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // initialize ip header 
 void ip_init_hdr(struct iphdr *ip, u32 saddr, u32 daddr, u16 len, u8 proto)
@@ -30,8 +31,20 @@ void ip_init_hdr(struct iphdr *ip, u32 saddr, u32 daddr, u16 len, u8 proto)
 // the input address is in host byte order
 rt_entry_t *longest_prefix_match(u32 dst)
 {
-	fprintf(stderr, "TODO: longest prefix match for the packet.\n");
-	return NULL;
+	// fprintf(stderr, "TODO: longest prefix match for the packet.\n");
+	rt_entry_t * rt_entry = NULL;
+	rt_entry_t * rt_longest_mask_entry = NULL;
+
+	list_for_each_entry(rt_entry, &rtable, list) {
+		if ((rt_entry->dest & rt_entry->mask) == (dst & rt_entry->mask)) {
+			if (rt_longest_mask_entry == NULL) {
+				rt_longest_mask_entry = rt_entry;	
+			} else if (rt_longest_mask_entry->mask < rt_entry->mask) {
+					rt_longest_mask_entry = rt_entry;
+			}
+		}
+	}
+	return rt_longest_mask_entry;
 }
 
 // send IP packet
@@ -40,5 +53,25 @@ rt_entry_t *longest_prefix_match(u32 dst)
 // router itself. This function is used to send ICMP packets.
 void ip_send_packet(char *packet, int len)
 {
-	fprintf(stderr, "TODO: send ip packet.\n");
+	// fprintf(stderr, "TODO: send ip packet.\n");
+	struct iphdr *ip_hdr = packet_to_ip_hdr(packet);
+	u32 dst = ntohl(ip_hdr->daddr);
+	rt_entry_t * rt_entry = longest_prefix_match(dst);
+
+	if (rt_entry == NULL) {
+		free(packet);
+		return ;
+	}
+
+	u32 next_hop = rt_entry->gw;
+
+	if (!next_hop) {
+		next_hop = dst;
+	}
+
+	struct ether_header *eh = (struct ether_header *)packet;
+	eh->ether_type = ntohs(ETH_P_IP);
+	memcpy(eh->ether_shost, rt_entry->iface->mac, ETH_ALEN);
+
+	iface_send_packet_by_arp(rt_entry->iface, next_hop, packet, len);
 }
