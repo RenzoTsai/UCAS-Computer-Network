@@ -33,20 +33,17 @@ void handle_ip_packet(iface_info_t *iface, char *packet, int len)
 	ip_header->ttl--;
 	if (ip_header->ttl <= 0) {
 		icmp_send_packet(packet, len, ICMP_TIME_EXCEEDED, ICMP_EXC_TTL);
+		free(packet);
 		return;
 	}
 
 	u32 dst_addr = ntohl(ip_header->daddr);
 	ip_header->checksum = ip_checksum(ip_header);
-	// struct ether_header *eh = (struct ether_header *)packet;
-
-
+	
 	rt_entry_t *rt_entry = NULL;
-	// rt_entry = longest_prefix_match(dst_addr);
-	// memcpy(eh->ether_shost, iface->mac, ETH_ALEN);
-	// memcpy(eh->ether_dhost, rt_entry->iface->mac, ETH_ALEN);
 	if ((rt_entry = longest_prefix_match(dst_addr)) == NULL) {
 		icmp_send_packet(packet, len, ICMP_DEST_UNREACH, ICMP_NET_UNREACH);
+		free(packet);
 	} else {
 		ip_send_packet(packet, len);
 	}

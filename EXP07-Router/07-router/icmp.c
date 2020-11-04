@@ -19,7 +19,7 @@ void icmp_send_packet(const char *in_pkt, int len, u8 type, u8 code)
 	if (type == ICMP_ECHOREPLY) {
 		packet_len = len;
 	} else {
-		packet_len = ETHER_HDR_SIZE + ICMP_HDR_SIZE + IP_HDR_SIZE(in_ip_hdr) + 8;
+		packet_len = ETHER_HDR_SIZE + ICMP_HDR_SIZE + IP_BASE_HDR_SIZE + IP_HDR_SIZE(in_ip_hdr) + 8;
 	}
 
 	char *packet = (char *)malloc(packet_len);
