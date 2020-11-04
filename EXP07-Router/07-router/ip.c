@@ -14,7 +14,7 @@ void ip_forward_package(iface_info_t *iface, char *packet, int len);
 // packet.
 void handle_ip_packet(iface_info_t *iface, char *packet, int len)
 {
-	// fprintf(stderr, "TODO: handle ip packet.\n");
+	fprintf(stderr, "TODO: handle ip packet.\n");
 	struct iphdr * ip_header = packet_to_ip_hdr(packet);
 	struct icmphdr * icmp_header = (struct icmphdr *)(IP_DATA(ip_header));
 	u32 dst_addr = ntohl(ip_header->daddr);
@@ -27,6 +27,7 @@ void handle_ip_packet(iface_info_t *iface, char *packet, int len)
 }
 
  void ip_forward_package(iface_info_t *iface, char *packet, int len){
+	fprintf(stderr, "TODO: forward ip packet.\n");
 	struct iphdr * ip_header = packet_to_ip_hdr(packet);
 
 	ip_header->ttl--;
@@ -36,7 +37,7 @@ void handle_ip_packet(iface_info_t *iface, char *packet, int len)
 	}
 
 	u32 dst_addr = ntohl(ip_header->daddr);
-	ip_header->checksum = (ip_header);
+	ip_header->checksum = ip_checksum(ip_header);
 	// struct ether_header *eh = (struct ether_header *)packet;
 
 

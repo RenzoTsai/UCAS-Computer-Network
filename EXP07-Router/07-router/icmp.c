@@ -11,7 +11,7 @@
 // send icmp packet
 void icmp_send_packet(const char *in_pkt, int len, u8 type, u8 code)
 {
-	// fprintf(stderr, "TODO: malloc and send icmp packet.\n");
+	fprintf(stderr, "TODO: malloc and send icmp packet.\n");
 	
 	int packet_len = 0; 
 	struct iphdr *in_ip_hdr = packet_to_ip_hdr(in_pkt);
@@ -21,7 +21,7 @@ void icmp_send_packet(const char *in_pkt, int len, u8 type, u8 code)
 	} else {
 		packet_len = ETHER_HDR_SIZE + ICMP_HDR_SIZE + IP_HDR_SIZE(in_ip_hdr) + 8;
 	}
-	
+
 	char *packet = (char *)malloc(packet_len);
 
 	struct ether_header *eh = (struct ether_header *)packet;
@@ -41,15 +41,14 @@ void icmp_send_packet(const char *in_pkt, int len, u8 type, u8 code)
 	icmp_hdr->type = type;
 	icmp_hdr->code = code;
 	
-	
 	if (type != ICMP_ECHOREPLY) {
-		memset(icmp_hdr + ICMP_HDR_SIZE - 4, 0, 4);
-		memcpy(icmp_hdr + ICMP_HDR_SIZE, in_ip_hdr, IP_HDR_SIZE(in_ip_hdr) + 8);
+		memset((char*)icmp_hdr + ICMP_HDR_SIZE - 4, 0, 4);
+		memcpy((char*)icmp_hdr + ICMP_HDR_SIZE, in_ip_hdr, IP_HDR_SIZE(in_ip_hdr) + 8);
 	} else {
-		memcpy(icmp_hdr + ICMP_HDR_SIZE - 4,
-		in_ip_hdr + IP_HDR_SIZE(in_ip_hdr) + 4,
+		memcpy((char*)icmp_hdr + ICMP_HDR_SIZE - 4,
+		(char*)in_ip_hdr + IP_HDR_SIZE(in_ip_hdr) + 4,
 		len - ETHER_HDR_SIZE - IP_HDR_SIZE(in_ip_hdr) - 4);
 	}
-	icmp_hdr->checksum = icmp_checksum(icmp_hdr, packet_len-ETHER_HDR_SIZE-IP_HDR_SIZE(in_ip_hdr));
+	icmp_hdr->checksum = icmp_checksum(icmp_hdr, packet_len - ETHER_HDR_SIZE - IP_HDR_SIZE(in_ip_hdr));
 	ip_send_packet(packet, packet_len);
 }
