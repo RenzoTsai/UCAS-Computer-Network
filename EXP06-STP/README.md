@@ -48,7 +48,7 @@ static void stp_handle_config_packet(stp_t *stp, stp_port_t *p,
 
     - 更新本节点其他端口的config
 
-    - 若本节点不再是根节点，则停止本节点的计时器，并将config通过指定节点发出
+    - 若本节点不再是根节点，则停止本节点的计时器，并将config通过指定端口发出
 
 ### 上述代码中涉及到的子函数代码及其解释
 
