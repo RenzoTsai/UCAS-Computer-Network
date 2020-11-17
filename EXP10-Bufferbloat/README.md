@@ -95,11 +95,11 @@ BBR可以获取非常高的带宽利用率，是因为它能探测到带宽的�
 
 BBR算法根据互联网的拥塞行为有针对性地定义了4中状态，即STARTUP，DRAIN，PROBE_BW，PROBE_RTT。BBR通过对上述计算的即时带宽bw以及rtt的持续观察，在这4个状态之间自由切换，相比之前的所有拥塞控制算法，其改进在于其拥塞算法不再跟踪系统的TCP拥塞状态机，而是用统一的方式来应对pacing rate和cwnd的计算。
 
-#### 结果输出-pacing rate和cwnd
+#### 输出pacing rate和cwnd
 
 BBR的输出并不仅仅是一个cwnd，更重要的是pacing rate。在传统意义上，cwnd是TCP拥塞控制算法的唯一输出，它只规定了当前的TCP最多可以发送多少数据，它并没有规定怎么把这么多数据发出去。在Linux的实现中，在忽略接收端通告窗口的前提下，Linux会把cwnd一窗数据全部突发出去，而这往往会造成路由器的排队，在深队列的情况下，会测量出rtt剧烈地抖动。BBR在计算cwnd的同时，还计算了一个与之适配的pacing rate，该pacing rate规定cwnd指示的一窗数据的数据包之间，以多大的时间间隔发送出去。
 
-通过上述特点的控制BBR能很好地调度资源，从而解决Bufferbloat问题
+通过上述特点的控制BBR能很好地调度资源，从而解决Bufferbloat问题。
 
 ### HPCC
 
