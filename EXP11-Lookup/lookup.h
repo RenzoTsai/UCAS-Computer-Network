@@ -6,6 +6,8 @@ typedef struct treeNode {
     int port;
     struct treeNode * left;
     struct treeNode * right; 
+    struct treeNode * parent;
+    
 } TreeNode;
 
 typedef struct {
@@ -24,7 +26,7 @@ TreeNode * init_tree();
 
 TreeNode * root;
 
-TreeNode * insert_tree(RouterEntry* entry, int p_len);
+TreeNode * insert_tree(RouterEntry* entry, int p_len, TreeNode* parent);
 
 int add_node (RouterEntry* entry);
 
