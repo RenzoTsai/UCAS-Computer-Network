@@ -7,7 +7,6 @@ typedef struct treeNode {
     struct treeNode * left;
     struct treeNode * right; 
     struct treeNode * parent;
-    
 } TreeNode;
 
 typedef struct {

@@ -59,7 +59,8 @@ int main() {
     gettimeofday(&end,NULL);
     time_use=(end.tv_sec-start.tv_sec)*1E9+(end.tv_usec-start.tv_usec)*1E3;
     other_time  = time_use/input_num;
-    
+
+    // minus the time of input handling
     printf("time_use is %.9f\n",total_time - other_time);
     
     return 0;
@@ -109,7 +110,7 @@ TreeNode * init_tree() {
     return root;
 }
 
-TreeNode * insert_tree(RouterEntry* entry, int p_len) {
+TreeNode * insert_tree(RouterEntry* entry, int p_len, TreeNode* parent) {
     TreeNode * treeNode = (TreeNode *) malloc(sizeof(TreeNode));
     total_mem += sizeof(TreeNode);
     if (treeNode == NULL) {
@@ -122,15 +123,21 @@ TreeNode * insert_tree(RouterEntry* entry, int p_len) {
     } else {
         treeNode->port = entry->port; 
     }
+    treeNode->parent = parent;
     return treeNode;
+}
+
+int look_back(TreeNode * node) {
+    TreeNode * ptr = node;
+    while (ptr->port == -1) {
+        ptr = ptr->parent;
+    }
+    return ptr->port;
 }
 
 int get_mask (int prefix_len) {
     int mask = 0x80000000;
-    for (int i = 1; i < prefix_len; i++) {
-        mask = mask >> 1;
-    }
-    return mask;
+    return mask >> (prefix_len-1);
 }
 
 int add_node (RouterEntry* entry) {
@@ -142,13 +149,13 @@ int add_node (RouterEntry* entry) {
     for (int i = 1; i <= entry->prefix_len; i++) {
         if ((entry->net&prefix_bit) == 0) {
             if (ptr->left == NULL) {
-                ptr->left = insert_tree(entry, i);
+                ptr->left = insert_tree(entry, i, ptr);
                 insert_num ++;
             } 
             ptr = ptr->left;
         } else {
             if (ptr->right == NULL) {
-                 ptr->right = insert_tree(entry, i);
+                 ptr->right = insert_tree(entry, i, ptr);
                  insert_num ++;
             } 
             ptr = ptr->right;
@@ -172,41 +179,42 @@ int add_node (RouterEntry* entry) {
 
 int lookup (int netID) {
     TreeNode * ptr = root;
-    int mask = 0x80000000;
     unsigned int prefix_bit = 0x80000000;
-    int len_diff;
-
-    int insert_num = 0;
-    for (int i = 1; i < 32; i++) {
+    int i;
+    int port;
+    for (i = 1; i < 32; i++) {
         if ((netID & prefix_bit) == 0) {
             if (ptr->left == NULL) {
                 if ((netID & get_mask(ptr->prefix_len)) != (ptr->net & get_mask(ptr->prefix_len))){
-                    return -1;
+                    port = -1;
+                    break;
                 }   
-                return ptr->port; 
+                port = ptr->port;
+                break;
             } 
-            len_diff = ptr->left->prefix_len - ptr->prefix_len;
             ptr = ptr->left;
         } else {
             if (ptr->right == NULL) {
                 if ((netID & get_mask(ptr->prefix_len)) != (ptr->net & get_mask(ptr->prefix_len))){
-                    return -1;
+                    port = -1;
+                    break;
                 }
-                return ptr->port; 
+                port = ptr->port;
+                break;
             } 
-            len_diff = ptr->right->prefix_len - ptr->prefix_len;
             ptr = ptr->right;
         }
-        mask = mask >> len_diff;
-        prefix_bit = prefix_bit >> len_diff;
+        prefix_bit = prefix_bit >> 1;
     }
 
-    if ((netID&mask) != (ptr->net&mask)) {
-        return -1;
+    if ((netID&get_mask(i)) != (ptr->net&get_mask(i))) {
+        port = -1;
     }
 
-    return ptr->port;
-
+    if(port == -1){
+        port = look_back(ptr);
+    }
+    return port;
 }
 
 void compress_node(TreeNode * node) {
@@ -214,13 +222,13 @@ void compress_node(TreeNode * node) {
         if (node->left->left != NULL && node->left->right == NULL) {
             TreeNode * compressed_node = node->left;
             node->left = node->left->left;
-            printf("net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
+            printf("compressed net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
             free(compressed_node);
             total_mem -= sizeof(TreeNode);
         } else if (node->left->left == NULL && node->left->right != NULL) {
             TreeNode * compressed_node = node->left;
             node->left = node->left->right;
-            printf("net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
+            printf("compressed net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
             free(compressed_node);
             total_mem -= sizeof(TreeNode);
         }
@@ -229,13 +237,13 @@ void compress_node(TreeNode * node) {
         if (node->right->left != NULL && node->right->right == NULL) {
             TreeNode * compressed_node = node->right;
             node->right = node->right->left;
-            printf("net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
+            printf("compressed net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
             free(compressed_node);
             total_mem -= sizeof(TreeNode);
         } else if (node->right->left == NULL && node->right->right != NULL) {
             TreeNode * compressed_node = node->right;
             node->right = node->right->right;
-            printf("net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
+            printf("compressed net:%x\n",compressed_node->net&get_mask(compressed_node->prefix_len));
             free(compressed_node);
             total_mem -= sizeof(TreeNode);
         }
