@@ -57,23 +57,24 @@ void *sending_mospf_hello_thread(void *param)
 	fprintf(stdout, "TODO: send mOSPF Hello message periodically.\n");
 	while (1){
 		sleep(MOSPF_DEFAULT_HELLOINT);
+		pthread_mutex_lock(&mospf_lock);
 		iface_info_t * iface = NULL;
 		list_for_each_entry (iface, &instance->iface_list, list) {
 			int len = ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + MOSPF_HDR_SIZE + MOSPF_HELLO_SIZE;
 			char * packet = (char*)malloc(len);
-			struct iphdr *ip_hdr = packet_to_ip_hdr(packet);
-
+		
 			struct ether_header *eh = (struct ether_header *)packet;
 			eh->ether_type = htons(ETH_P_IP);
 			memcpy(eh->ether_shost, iface->mac, ETH_ALEN);
-			u8 dhost[ETH_ALEN] = {0x01,0x00,0x5e,0x00,0x00,0x5};
+			u8 dhost[ETH_ALEN] = {0x01,0x00,0x5e,0x00,0x00,0x05};
 			memcpy(eh->ether_dhost, dhost, ETH_ALEN);
 
+			struct iphdr *ip_hdr = packet_to_ip_hdr(packet);
 			u32 dst_ip = MOSPF_ALLSPFRouters;
 			ip_init_hdr(ip_hdr,
 						iface->ip,
 						dst_ip,
-						len - ETH_ALEN,
+						len - ETHER_HDR_SIZE,
 						IPPROTO_MOSPF);
 
 			struct mospf_hdr * mospf_header = (struct mospf_hdr *)((char *)ip_hdr + IP_BASE_HDR_SIZE);
@@ -89,6 +90,7 @@ void *sending_mospf_hello_thread(void *param)
 			mospf_header->checksum = mospf_checksum(mospf_header);
 			iface_send_packet(iface, packet, len);
 		}
+		pthread_mutex_unlock(&mospf_lock);
 	}
 	return NULL;
 }
@@ -143,15 +145,16 @@ void *checking_database_thread(void *param)
 void handle_mospf_hello(iface_info_t *iface, const char *packet, int len)
 {
 	fprintf(stdout, "TODO: handle mOSPF Hello message.\n");
+	pthread_mutex_lock(&mospf_lock);
 	mospf_nbr_t * nbr_pos = NULL;
 	struct iphdr *ip_hdr = packet_to_ip_hdr(packet);
-	struct mospf_hdr * mospf_head = (struct mospf_hdr *)(ip_hdr + IP_HDR_SIZE(ip_hdr));
-	struct mospf_hello * hello = (struct mospf_hello *)(mospf_head + MOSPF_HDR_SIZE);
+	struct mospf_hdr * mospf_head = (struct mospf_hdr *)((char*)ip_hdr + IP_HDR_SIZE(ip_hdr));
+	struct mospf_hello * hello = (struct mospf_hello *)((char*)mospf_head + MOSPF_HDR_SIZE);
 	u32 id = ntohl(mospf_head->rid);
 	u32 ip = ntohl(ip_hdr->saddr);
 	u32 mask = ntohl(hello->mask);
 	int isFound = 0; 
-	pthread_mutex_lock(&mospf_lock);
+	
 	list_for_each_entry(nbr_pos, &iface->nbr_list, list) {
 		if (nbr_pos->nbr_ip == ip) {
 			nbr_pos->alive = 0;
@@ -165,7 +168,7 @@ void handle_mospf_hello(iface_info_t *iface, const char *packet, int len)
 		nbr_pos->nbr_id = id;
 		nbr_pos->nbr_ip = ip;
 		nbr_pos->nbr_mask = mask;
-		//init_list_head(nbr_pos->list);
+		//init_list_head(&nbr_pos->list);
 		list_add_tail(&(nbr_pos->list), &iface->nbr_list);
 		iface->num_nbr++;
 	}
@@ -200,14 +203,15 @@ void *sending_mospf_lsu_thread(void *param)
 				array[index].mask = htonl(iface->mask);
 				array[index].network = htonl(iface->ip & iface->mask);
 				array[index].rid = 0;
+				index++;
 			} else {
 				list_for_each_entry (nbr_pos, &iface->nbr_list, list) {
 					array[index].mask = htonl(nbr_pos->nbr_mask);
 					array[index].network = htonl(nbr_pos->nbr_ip & nbr_pos->nbr_mask);
 					array[index].rid = htonl(nbr_pos->nbr_id);
+					index++;
 				}
-			}
-			index++;
+			}	
 		}
 
 		int len = ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + MOSPF_HDR_SIZE + MOSPF_LSU_SIZE + nbr_num * MOSPF_LSA_SIZE;
@@ -269,9 +273,6 @@ void handle_mospf_lsu(iface_info_t *iface, char *packet, int len)
 	u8 ttl = lsu->ttl;
 	u32 nadv = ntohl(lsu->nadv);
 	int isFound = 0; 
-	fprintf(stdout, IP_FMT"\t\n",
-				    HOST_IP_FMT_STR(rid)
-			        );
 	pthread_mutex_lock(&mospf_lock);
 
 	//find db entry
@@ -328,29 +329,31 @@ void handle_mospf_lsu(iface_info_t *iface, char *packet, int len)
 
 	//send LSU if ttl > 0
 	lsu->ttl--;
-	mospf_nbr_t * nbr_pos = NULL;
-	iface_info_t * iface_pos = NULL;
 	if (lsu->ttl > 0) {
+		mospf_nbr_t * nbr_pos = NULL;
+		iface_info_t * iface_pos = NULL;
 		list_for_each_entry (iface_pos, &instance->iface_list, list) {
 			if (iface_pos->index == iface->index) {
 				continue;
 			}
-			
-			list_for_each_entry (nbr_pos, &iface->nbr_list, list) {
+			nbr_pos = NULL;
+			list_for_each_entry (nbr_pos, &iface_pos->nbr_list, list) {
 				char * forwarding_packet = (char*) malloc(len);
 				memcpy(forwarding_packet, packet, len);
 				struct ether_header * eh = (struct ether_header *) forwarding_packet;
-				memcpy(eh->ether_dhost, iface_pos->mac, ETH_ALEN);
+				memcpy(eh->ether_shost, iface_pos->mac, ETH_ALEN);
 
 				struct iphdr * iph = packet_to_ip_hdr(forwarding_packet);
+				u32 dst_ip = nbr_pos->nbr_ip;
 				ip_init_hdr(iph,
 							iface_pos->ip,
-							nbr_pos->nbr_ip,
+							dst_ip,
 							len - ETHER_HDR_SIZE,
 							IPPROTO_MOSPF);
 
 				struct mospf_hdr * mospfh = (struct mospf_hdr *)((char *)iph + IP_HDR_SIZE(iph));
 				mospfh->checksum = mospf_checksum(mospfh);
+				iph->checksum = ip_checksum(iph);
 				ip_send_packet(forwarding_packet, len);
 			}
 		}
