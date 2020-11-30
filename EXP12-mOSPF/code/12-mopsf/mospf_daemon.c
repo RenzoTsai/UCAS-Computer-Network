@@ -197,11 +197,10 @@ void *sending_mospf_lsu_thread(void *param)
 		pthread_mutex_lock(&mospf_lock);
 		list_for_each_entry (iface, &instance->iface_list, list) {
 			if (iface->num_nbr == 0) {
+				array[index].mask = htonl(iface->mask);
+				array[index].network = htonl(iface->ip & iface->mask);
 				array[index].rid = 0;
-				array[index].mask = 0;
-				array[index].network = 0;
 			} else {
-				nbr_pos = NULL;
 				list_for_each_entry (nbr_pos, &iface->nbr_list, list) {
 					array[index].mask = htonl(nbr_pos->nbr_mask);
 					array[index].network = htonl(nbr_pos->nbr_ip & nbr_pos->nbr_mask);
@@ -257,14 +256,14 @@ void handle_mospf_lsu(iface_info_t *iface, char *packet, int len)
 	fprintf(stdout, "TODO: handle mOSPF LSU message.\n");
 	mospf_db_entry_t * entry_pos = NULL;
 	struct iphdr *ip_hdr = packet_to_ip_hdr(packet);
-	struct mospf_hdr * mospf_head = (struct mospf_hdr *)((char*)ip_hdr+ IP_HDR_SIZE(ip_hdr));
+	struct mospf_hdr * mospf_head = (struct mospf_hdr *)((char*)ip_hdr + IP_HDR_SIZE(ip_hdr));
 	struct mospf_lsu * lsu = (struct mospf_lsu *)((char*)mospf_head + MOSPF_HDR_SIZE);
 	struct mospf_lsa * lsa = (struct mospf_lsa *)((char*)lsu + MOSPF_LSU_SIZE);
 	u32 rid = ntohl(mospf_head->rid);
-	if (rid == 0) {
+
+	if(instance->router_id == rid){
 		return;
-		fprintf(stdout, "invalid lsu rid.\n");
-	}
+	} 
 	u32 ip = ntohl(ip_hdr->saddr);
 	u16 seq = ntohs(lsu->seq);
 	u8 ttl = lsu->ttl;
@@ -315,14 +314,16 @@ void handle_mospf_lsu(iface_info_t *iface, char *packet, int len)
 		list_add_tail(&(entry_pos->list), & mospf_db);
 	}
 
+	printf("RID\tNetwork\tMask\tNeighbor\n");
 	list_for_each_entry(entry_pos, &mospf_db, list){
-    	for(int i = 0;i < entry_pos->nadv; i++)
+    	for(int i = 0;i < entry_pos->nadv; i++) {
     		fprintf(stdout, IP_FMT"\t"IP_FMT"\t"IP_FMT"\t"IP_FMT"\n",
     			    HOST_IP_FMT_STR(entry_pos->rid),
 				    HOST_IP_FMT_STR(entry_pos->array[i].network), 
 				    HOST_IP_FMT_STR(entry_pos->array[i].mask),
 				    HOST_IP_FMT_STR(entry_pos->array[i].rid)
 			        );
+		}
     }
 
 	//send LSU if ttl > 0
@@ -340,10 +341,16 @@ void handle_mospf_lsu(iface_info_t *iface, char *packet, int len)
 				memcpy(forwarding_packet, packet, len);
 				struct ether_header * eh = (struct ether_header *) forwarding_packet;
 				memcpy(eh->ether_dhost, iface_pos->mac, ETH_ALEN);
+
 				struct iphdr * iph = packet_to_ip_hdr(forwarding_packet);
-				struct mospf_hdr * mospfh = (struct mospf_hdr *)(iph + IP_HDR_SIZE(iph));
+				ip_init_hdr(iph,
+							iface_pos->ip,
+							nbr_pos->nbr_ip,
+							len - ETHER_HDR_SIZE,
+							IPPROTO_MOSPF);
+
+				struct mospf_hdr * mospfh = (struct mospf_hdr *)((char *)iph + IP_HDR_SIZE(iph));
 				mospfh->checksum = mospf_checksum(mospfh);
-				ip_init_hdr(iph, iface_pos->ip, nbr_pos->nbr_ip, len - ETHER_HDR_SIZE, IPPROTO_MOSPF);
 				ip_send_packet(forwarding_packet, len);
 			}
 		}
