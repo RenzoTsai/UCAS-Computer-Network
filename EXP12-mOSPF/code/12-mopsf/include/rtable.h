@@ -28,6 +28,7 @@ void clear_rtable();
 void add_rt_entry(rt_entry_t *entry);
 void remove_rt_entry(rt_entry_t *entry);
 void print_rtable();
+void update_rtable();
 rt_entry_t *new_rt_entry(u32 dest, u32 mask, u32 gw, iface_info_t *iface);
 
 rt_entry_t *longest_prefix_match(u32 ip);

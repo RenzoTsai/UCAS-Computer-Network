@@ -19,10 +19,7 @@ extern ustack_t *instance;
 
 pthread_mutex_t mospf_lock;
 
-#define MAX_NODE_NUM 255
 int idx;
-
-void update_rtable();
 
 void mospf_init()
 {
@@ -62,7 +59,6 @@ void print_mospf_db() {
                     );
         }
     }
-	printf("\n");
 }
 
 void sending_mospf_lsu()
@@ -105,9 +101,6 @@ void sending_mospf_lsu()
 
 	iface = NULL;
 	list_for_each_entry (iface, &instance->iface_list, list) { 
-		// if (iface->num_nbr == 0) {
-		// 	continue;
-		// }
 		mospf_nbr_t * nbr_pos = NULL;
 		list_for_each_entry (nbr_pos, &iface->nbr_list, list) {
 			char * packet = (char*)malloc(len);
@@ -271,7 +264,6 @@ void handle_mospf_hello(iface_info_t *iface, const char *packet, int len)
 		new_nbr->nbr_id = id;
 		new_nbr->nbr_ip = ip;
 		new_nbr->nbr_mask = mask;
-		//init_list_head(&nbr_pos->list);
 		list_add_tail(&(new_nbr->list), &iface->nbr_list);
 		iface->num_nbr++;
 		sending_mospf_lsu();
@@ -317,7 +309,6 @@ void handle_mospf_lsu(iface_info_t *iface, char *packet, int len)
 				entry_pos->seq = seq;
 				entry_pos->nadv = nadv;
 				entry_pos->alive = 0;
-				//entry_pos->array = (struct mospf_lsa *)realloc(entry_pos->array, MOSPF_LSA_SIZE * nadv);
 				for (int i = 0; i < nadv; i++) {
 					entry_pos->array[i].mask = ntohl(lsa[i].mask);
 					entry_pos->array[i].network = ntohl(lsa[i].network);
@@ -418,96 +409,93 @@ void handle_mospf_packet(iface_info_t *iface, char *packet, int len)
 	}
 }
 
-int get_router_list_index(int rid) {
-	for (int i = 0; i < ROUTER_NUM; i++) {
-		if (rid == router_list[i]) {
-			return i;
-		}
-	}
+int get_router_list_index(u32 rid) {
+	for(int i = 0; i < idx; i ++ )
+		if(router_list[i] == rid) {
+            return i;
+        } 
 	return -1;
 }
 
-int find_next_hop(int t, int prev[]) {
-	while(prev[t] != 0) {
-        t = prev[t];
-    } 
-	return t;
-}
+void init_graph() {
+    memset(graph, INT8_MAX -1, sizeof(graph));
+    mospf_db_entry_t *db_entry = NULL;
+	router_list[0] = instance->router_id;
+	idx = 1;
 
-int check_rtable(u32 network, u32 mask) {
-	rt_entry_t *rt_entry = NULL;
-	list_for_each_entry(rt_entry, &rtable, list) {
-		if(rt_entry->dest == network && rt_entry->mask == mask) return 1;
+	list_for_each_entry(db_entry, &mospf_db, list) {
+		router_list[idx ++ ] = db_entry->rid;
 	}
-	return 0;
-}
-
-void init_graph()
-{
-	memset(graph, 0, sizeof(graph));
-    memset(router_list, 0, sizeof(router_list));
-    router_list[0] = instance->router_id;
-    int index = 1;
-    mospf_db_entry_t *db_pos = NULL;
-
-	list_for_each_entry (db_pos, &mospf_db, list) {
-        router_list[index] = db_pos->rid;
-        index ++;
-		int u = get_router_list_index(db_pos->rid);
-		for (int i = 0; i < db_pos->nadv; i ++ ) {
-			if(!db_pos->array[i].rid){
+    
+    db_entry = NULL;
+	list_for_each_entry(db_entry, &mospf_db, list) {
+		int u = get_router_list_index(db_entry->rid);
+		for(int i = 0; i < db_entry->nadv; i ++ ) {
+			if(!db_entry->array[i].rid) {
                 continue;
             } 
-			int v = get_router_list_index(db_pos->array[i].rid);
+			int v = get_router_list_index(db_entry->array[i].rid);
 			graph[u][v] = graph[v][u] = 1;
 		}
 	}
 }
 
-int min_dist(int *dist, int *visited, int num) {
-	int index = 0;
-	int min = INT16_MAX;
-	for (int u = 0; u < num; u++) {
-		if (visited[u]) {
-			for (int v = 0; v < num; v++) {
-				if (visited[v] == 0 && graph[u][v] > 0 && graph[u][v] + dist[u] < min) {
-					min = graph[u][v] + dist[u];
-					index = v;
-				}
-			}
-		}
+int find_next_hop(int i, int *prev) {
+	while(prev[i] != 0) {
+        i = prev[i];
+    }
+	return i;
+}
+
+int check_rtable(u32 network, u32 mask) {
+	rt_entry_t *rt_entry = NULL;
+	list_for_each_entry(rt_entry, &rtable, list) {
+		if(rt_entry->dest == network && rt_entry->mask == mask) {
+            return 1;
+        } 
 	}
-	dist[index] = min;
+	return 0;
+}
+
+int min_dist(int *dist, int *visited, int num) {
+	int index = -1;
+	for (int u = 0; u < num; u++) {
+        if (visited[u]) {
+            continue;
+        }
+		if (index == -1 || dist[u] < dist[index]) {
+			index = u;
+		}
+		
+	}
 	return index;
 }
 
-void Dijkstra(int prev[], int dist[])
-{
-    int visited[MAX_NODE_NUM];
+void Dijkstra(int prev[], int dist[]) {
+    int visited[ROUTER_NUM];
 	for(int i = 0; i < ROUTER_NUM; i++) {
-		dist[i] = INT16_MAX;
+		prev[i] = -1;
+		dist[i] = INT8_MAX;
 		visited[i] = 0;
 	}
 
 	dist[0] = 0;
-	visited[0] = 1;
 
-	for(int i = 0; i < ROUTER_NUM; i++) {
-		int u = min_dist(dist, visited, ROUTER_NUM);
+	for(int i = 0; i < idx; i++) {
+		int u = min_dist(dist, visited, idx);
 		visited[u] = 1;
-		for (int v = 0; v < ROUTER_NUM; v++){
-			if (visited[v] == 0 && graph[u][v] > 0 && dist[u] + graph[u][v] < dist[v]) {
+		for (int v = 0; v < idx; v++){
+			if (visited[v] == 0 && dist[u] + graph[u][v] < dist[v]) {
 				dist[v] = dist[u] + graph[u][v];
 				prev[v] = u;
 			}
 		}
 	}
+
 }
 
-
-void rebuild_router(int prev[], int dist[])
-{
-    int visited[MAX_NODE_NUM];
+void update_router (int prev[], int dist[]) {
+    int visited[ROUTER_NUM];
 	memset(visited, 0, sizeof(visited));
 	visited[0] = 1; 
 	
@@ -518,12 +506,15 @@ void rebuild_router(int prev[], int dist[])
         } 
 	}
 
-	for (int i = 0; i < ROUTER_NUM; i ++ ) {
+	for (int i = 0; i < idx; i ++ ) {
 		int t = -1;
-		for(int j = 0; j < ROUTER_NUM; j ++ ) {
-			if(visited[j]) continue; 
-			if(t == -1 || dist[j] < dist[t])
+		for(int j = 0; j < idx; j ++ ) {
+			if(visited[j]) {
+				continue;
+			}
+			if(t == -1 || dist[j] < dist[t]){
 				t = j;
+			}
 		}
 		visited[t] = 1;
 
@@ -531,27 +522,32 @@ void rebuild_router(int prev[], int dist[])
 		list_for_each_entry(db_entry, &mospf_db, list) {
 			if(db_entry->rid == router_list[t]) {
 				int next_hop_id = find_next_hop(t, prev);
-				iface_info_t *iface, *src_iface;
+				iface_info_t *iface;
 				u32 gw;
-				int found = 0;
+				int isFound = 0;
 				list_for_each_entry (iface, &instance->iface_list, list) {
 					mospf_nbr_t *nbr_pos;
 					list_for_each_entry (nbr_pos, &iface->nbr_list, list) {
 						if(nbr_pos->nbr_id == router_list[next_hop_id]) {
-							found = 1;
+							isFound = 1;
 							gw = nbr_pos->nbr_ip;
 							src_iface = iface;
 							break;
 						}
 					}
-					if(found) break;
+					if(isFound){
+						break;
+					} 
 				}
-				if(!found) break;
+				if(!isFound){
+					break;
+				} 
 				for(int i = 0; i < db_entry->nadv; i ++) {
-					u32 network = db_entry->array[i].network, mask = db_entry->array[i].mask;
-					int exist = check_rtable(network, mask);
-					if(!exist) {
-						rt_entry_t *new_entry = new_rt_entry(network, mask, gw, src_iface);
+					u32 network = db_entry->array[i].network;
+					u32 mask = db_entry->array[i].mask;
+					int isExist = check_rtable(network, mask);
+					if(!isExist) {
+						rt_entry_t *new_entry = new_rt_entry(network, mask, gw, iface);
 						add_rt_entry(new_entry);
 					}
 				}
@@ -560,11 +556,11 @@ void rebuild_router(int prev[], int dist[])
 	}
 }
 
-void update_rtable()
-{
-    int prev[MAX_NODE_NUM];
-    int dist[MAX_NODE_NUM];
+
+void update_rtable() {
+    int prev[ROUTER_NUM];
+    int dist[ROUTER_NUM];
 	init_graph();
 	Dijkstra(prev, dist);
-	rebuild_router(prev, dist);
+	update_router(prev, dist);
 }
