@@ -32,16 +32,20 @@ void handle_ip_packet(iface_info_t *iface, char *packet, int len)
 		else if (ip->protocol == IPPROTO_MOSPF) {
 			handle_mospf_packet(iface, packet, len);
 		}
-
+		printf("free1\n");
 		free(packet);
+		printf("freed1\n");
 	}
 	else if (ip->daddr == htonl(MOSPF_ALLSPFRouters)) {
 		assert(ip->protocol == IPPROTO_MOSPF);
 		handle_mospf_packet(iface, packet, len);
-
+		printf("free2\n");
 		free(packet);
+		printf("freed2\n");
 	}
 	else {
+		printf("free3\n");
 		ip_forward_packet(daddr, packet, len);
+		printf("freed3\n");
 	}
 }
