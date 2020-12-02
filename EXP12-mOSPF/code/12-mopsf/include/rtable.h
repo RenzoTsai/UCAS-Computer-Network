@@ -18,7 +18,6 @@ typedef struct {
 	int flags;				// flags (could be omitted here)
 	char if_name[16];		// name of the interface
 	iface_info_t *iface;	// pointer to the interface structure
-	u8 check;				// flag (entry need to check)
 } rt_entry_t;
 
 extern struct list_head rtable;
