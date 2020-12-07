@@ -67,7 +67,6 @@ void check_rules(struct nat_mapping * mapping_entry) {
 		if (rule->external_ip == mapping_entry->external_ip && rule->external_port == mapping_entry->external_port) {
 			mapping_entry->internal_ip = rule->internal_ip;
 			mapping_entry->internal_port = rule->internal_port;
-			printf("Find a rule\n");
 		}
 	}
 }
@@ -88,10 +87,7 @@ void do_translation(iface_info_t *iface, char *packet, int len, int dir)
 	rmt_set->port = (int)port;
 	u8 hash = hash8((char*)rmt_set, 8);
 	struct nat_mapping * mapping_entry = NULL;
-	list_for_each_entry(mapping_entry, &nat.nat_mapping_list[hash], list) {
-		fprintf(stdout, "%x\n",mapping_entry->external_ip);
-		fprintf(stdout, "%x\n",mapping_entry->external_port);
-	}
+	
 	if (dir == DIR_IN) {
 		int isExisting = 0;
 		list_for_each_entry(mapping_entry, &nat.nat_mapping_list[hash], list) {
@@ -107,7 +103,7 @@ void do_translation(iface_info_t *iface, char *packet, int len, int dir)
 			mapping_entry->external_port = ntohs(tcp_hdr->dport);
 			check_rules(mapping_entry);
 			list_add_tail(&mapping_entry->list, &nat.nat_mapping_list[hash]);
-			printf("Add a DNAT mapping entry.\n");
+			// printf("Add a DNAT mapping entry.\n");
 		}
 		tcp_hdr->dport = htons(mapping_entry->internal_port);
 		ip_hdr->daddr = htonl(mapping_entry->internal_ip);
@@ -184,29 +180,26 @@ void *nat_timeout()
 {
 	while (1) {
 		sleep(1);
-		// pthread_mutex_lock(&nat.lock);
-		// fprintf(stdout, "TODO: sweep finished flows periodically.\n");
-		// for (int i = 0; i < HASH_8BITS; i++) {
-		// 	struct list_head * head = &(nat.nat_mapping_list[i]);
-		// 	struct nat_mapping * mapping_entry, *mapping_entry_q;
-		// 	list_for_each_entry_safe (mapping_entry, mapping_entry_q, head, list) {
-		// 		printf("mapping_entry: %x\n", mapping_entry->internal_ip);
-		// 		if (time(NULL) - mapping_entry->update_time > TCP_ESTABLISHED_TIMEOUT) {
-		// 			nat.assigned_ports[mapping_entry->external_port] = 0;
-		// 			list_delete_entry(&mapping_entry->list);
-		// 			fprintf(stdout, "TODO: sweep finished flows 1.\n");
-		// 			//free(mapping_entry);
-		// 			continue;
-		// 		}
-		// 		if (is_flow_finished(&mapping_entry->conn)) {
-		// 			nat.assigned_ports[mapping_entry->external_port] = 0;
-		// 			list_delete_entry(&mapping_entry->list);
-		// 			fprintf(stdout, "TODO: sweep finished flows 2.\n");
-		// 			//free(mapping_entry);
-		// 		}
-		// 	}
-		// }
-		// pthread_mutex_unlock(&nat.lock);
+		pthread_mutex_lock(&nat.lock);
+		for (int i = 0; i < HASH_8BITS; i++) {
+			struct nat_mapping * mapping_entry, *mapping_entry_q;
+			list_for_each_entry_safe (mapping_entry, mapping_entry_q, &nat.nat_mapping_list[i], list) {
+				if (time(NULL) - mapping_entry->update_time > TCP_ESTABLISHED_TIMEOUT) {
+					nat.assigned_ports[mapping_entry->external_port] = 0;
+					list_delete_entry(&mapping_entry->list);
+					fprintf(stdout, "TODO: sweep finished flows.\n");
+					free(mapping_entry);
+					continue;
+				}
+				if (is_flow_finished(&mapping_entry->conn)) {
+					nat.assigned_ports[mapping_entry->external_port] = 0;
+					list_delete_entry(&mapping_entry->list);
+					fprintf(stdout, "TODO: sweep finished flows.\n");
+					free(mapping_entry);
+				}
+			}
+		}
+		pthread_mutex_unlock(&nat.lock);
 	}
 	
 	return NULL;
@@ -263,8 +256,6 @@ void parse_dnat_rules(char * line) {
 	int external_port = atoi(port1);
 	int internal_ip = net_parser(ip2);
 	int internal_port = atoi(port2);
-
-	printf("external_ip = %x, internal_ip =%x, i_ip=%d, e_ip=%d, ",external_ip, internal_ip, internal_port, external_port);
 
 	struct nat_mapping * mapping_entry = (struct nat_mapping *)malloc(sizeof(struct nat_mapping));
 	bzero(mapping_entry, sizeof(struct nat_mapping));
