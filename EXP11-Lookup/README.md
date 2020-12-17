@@ -186,7 +186,9 @@ typedef struct treeNode {
 } TreeNode;
 ```
 
-存在可以删去的冗余项，而 方法则大大简化了树节点的结构体，改进后的树节点结构如下：
+存在可以删去的冗余项，而`Leaf Pushing`方法则大大简化了树节点的结构体。
+
+改进后的树节点结构如下：
 
 ```c
 typedef struct treeNode {

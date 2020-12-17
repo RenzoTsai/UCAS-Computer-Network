@@ -56,11 +56,11 @@
 
 - 若该包是ARP请求包，则向发送请求的端口回复ARP包，传递该端口IP和MAC地址的解析信息，即调用`arp_send_reply` 函数进行ARP应答。
 
-#### arp.c 中 `arp_send_replp` 函数
+#### arp.c 中 `arp_send_reply` 函数
 
 当ARP请求的目的IP对应的收到ARP请求包，则向发送请求的端口回复ARP包，传递该端口IP和MAC地址的解析信息。
 
-`arp_send_replp` 函数需要根据`ARP协议`和接收到的`ARP请求`进行组包应答，具体实现函数如下：
+`arp_send_reply` 函数需要根据`ARP协议`和接收到的`ARP请求`进行组包应答，具体实现函数如下：
 
 ```c
 void arp_send_reply(iface_info_t *iface, struct ether_arp *req_hdr)
@@ -86,9 +86,9 @@ void arp_send_reply(iface_info_t *iface, struct ether_arp *req_hdr)
 
 #### arp.c 中 `arp_send_request` 函数
 
-被插入到ARP Cache中被缓存的条目若找不到这个IP的条目，说明还没有发过ARP请求，此时需要调用`arp_send_replp` 函数发送`ARP请求`。
+被插入到ARP Cache中被缓存的条目若找不到这个IP的条目，说明还没有发过ARP请求，此时需要调用`arp_send_reply` 函数发送`ARP请求`。
 
-`arp_send_replp` 函数需要根据`ARP协议`进行组包发送`ARP请求`，具体实现函数如下：
+`arp_send_reply` 函数需要根据`ARP协议`进行组包发送`ARP请求`，具体实现函数如下：
 
 ```c
 void arp_send_request(iface_info_t *iface, u32 dst_ip)
