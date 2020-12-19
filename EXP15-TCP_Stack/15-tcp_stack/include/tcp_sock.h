@@ -118,6 +118,9 @@ int tcp_sock_accept_queue_full(struct tcp_sock *tsk);
 void tcp_sock_accept_enqueue(struct tcp_sock *tsk);
 struct tcp_sock *tcp_sock_accept_dequeue(struct tcp_sock *tsk);
 
+void tcp_sock_listen_enqueue(struct tcp_sock *tsk);
+struct tcp_sock *tcp_sock_listen_dequeue(struct tcp_sock *tsk);
+
 int tcp_hash(struct tcp_sock *tsk);
 void tcp_unhash(struct tcp_sock *tsk);
 void tcp_bind_unhash(struct tcp_sock *tsk);
