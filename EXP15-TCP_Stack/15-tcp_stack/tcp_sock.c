@@ -375,5 +375,8 @@ void tcp_sock_close(struct tcp_sock *tsk)
 		tcp_set_state(tsk, TCP_FIN_WAIT_1);
 		printf("\n********** send FIN ***********\n");
 		tcp_send_control_packet(tsk, TCP_FIN|TCP_ACK);
+	} else {
+		tcp_unhash(tsk);
+		tcp_set_state(tsk, TCP_CLOSED);
 	}
 }
