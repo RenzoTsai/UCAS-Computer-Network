@@ -6,7 +6,7 @@
 
 [蔡润泽](https://github.com/RenzoTsai)
 
-[本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP15_Stack)
+[本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP15-TCP_Stack)
 
 ## 实验内容
 
