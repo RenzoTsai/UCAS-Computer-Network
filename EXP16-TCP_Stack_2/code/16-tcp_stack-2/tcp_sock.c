@@ -356,7 +356,6 @@ struct tcp_sock *tcp_sock_accept(struct tcp_sock *tsk)
 	struct tcp_sock * pop_stack;
 	if ((pop_stack = tcp_sock_accept_dequeue(tsk)) != NULL) {
 		tcp_set_state(pop_stack, TCP_ESTABLISHED);
-		// tcp_hash(pop_stack);
 		return pop_stack;
 	} else {
 		return NULL;

@@ -71,21 +71,6 @@ void handle_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb) {
 	tcp_send_control_packet(tsk, TCP_ACK);
 }
 
-// void handle_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb){	
-// 	for(int i=0; i<cb->pl_len ; ) {
-// 		while(ring_buffer_full(tsk->rcv_buf)){
-// 			sleep_on(tsk->wait_recv);
-// 		}
-// 		int wsize = min(ring_buffer_free(tsk->rcv_buf), cb->pl_len - i);
-// 		write_ring_buffer(tsk->rcv_buf, cb->payload + i, wsize);
-// 		i += wsize;
-// 		wake_up(tsk->wait_recv);
-// 	}
-// 	tsk->rcv_nxt = cb->seq + cb->pl_len;
-// 	tsk->snd_una = cb->ack;
-// 	tcp_send_control_packet(tsk, TCP_ACK);
-// }
-
 // Process the incoming packet according to TCP state machine. 
 void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
@@ -119,22 +104,6 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		}
 		return;
 	}
-
-	// if (tsk->state == TCP_SYN_RECV) {
-	// 	if ((tcp->flags & TCP_ACK) == TCP_ACK) {
-	// 		if (!tcp_sock_accept_queue_full(tsk)) {
-	// 			struct tcp_sock * csk = tcp_sock_listen_dequeue(tsk);
-	// 			if (!is_tcp_seq_valid(csk, cb)) {
-	// 				return;
-	// 			}
-	// 			csk->rcv_nxt = cb->seq;
-	// 	        csk->snd_una = cb->ack;
-	// 			tcp_sock_accept_enqueue(csk);
-	// 			wake_up(tsk->wait_accept);
-	// 		}
-	// 	}
-	// 	return;
-	// }
 
 	if (tsk->state == TCP_SYN_RECV) {
 		if ((tcp->flags & TCP_ACK) == TCP_ACK) {
@@ -193,6 +162,5 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 		}
 
 	}
-
 
 }

@@ -265,7 +265,7 @@ int tcp_sock_bind(struct tcp_sock *tsk, struct sock_addr *skaddr)
 //    means the connection is established.
 int tcp_sock_connect(struct tcp_sock *tsk, struct sock_addr *skaddr)
 {
-	fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
+	fprintf(stdout, "TODO: implement %s here.\n", __FUNCTION__);
 	u16 sport = tcp_get_port();
 	if (sport == 0) {
 		return -1;
@@ -290,7 +290,7 @@ int tcp_sock_connect(struct tcp_sock *tsk, struct sock_addr *skaddr)
 // TCP_STATE, and hash the tcp sock into listen_table
 int tcp_sock_listen(struct tcp_sock *tsk, int backlog)
 {
-	fprintf(stdout, "TODO: implement %s please.\n", __FUNCTION__);
+	fprintf(stdout, "TODO: implement %s here.\n", __FUNCTION__);
 	tsk->backlog = backlog;
 	tcp_set_state(tsk, TCP_LISTEN);
 	return tcp_hash(tsk);
@@ -356,7 +356,6 @@ struct tcp_sock *tcp_sock_accept(struct tcp_sock *tsk)
 	struct tcp_sock * pop_stack;
 	if ((pop_stack = tcp_sock_accept_dequeue(tsk)) != NULL) {
 		tcp_set_state(pop_stack, TCP_ESTABLISHED);
-		// tcp_hash(pop_stack);
 		return pop_stack;
 	} else {
 		return NULL;
