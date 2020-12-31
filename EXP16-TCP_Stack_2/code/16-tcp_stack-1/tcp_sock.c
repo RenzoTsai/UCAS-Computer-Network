@@ -270,7 +270,7 @@ int tcp_sock_connect(struct tcp_sock *tsk, struct sock_addr *skaddr)
 	if (sport == 0) {
 		return -1;
 	}
-	printf("ip:%x\n",skaddr->ip);
+	//printf("ip:%x\n",skaddr->ip);
 	u32 saddr = longest_prefix_match(ntohl(skaddr->ip))->iface->ip;
 	tsk->sk_sip = saddr;
 	tsk->sk_sport = sport;
@@ -394,7 +394,6 @@ void send_data(struct tcp_sock *tsk, char *buf, int len) {
 	int send_packet_len = ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE + len;
 	char * packet = (char *)malloc(send_packet_len);
 	memcpy(packet + ETHER_HDR_SIZE + IP_BASE_HDR_SIZE + TCP_BASE_HDR_SIZE, buf, len);
-	tsk->snd_wnd = len;
 	tcp_send_packet(tsk, packet, send_packet_len);
 }
 
@@ -406,7 +405,9 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	while (len > 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
 		send_data(tsk, buf + (tsk->snd_una - init_seq), single_len);
-		sleep_on(tsk->wait_send);
+		if (tsk->snd_wnd == 0) {
+			sleep_on(tsk->wait_send);
+		}
 		len -= single_len;
 	}
 
