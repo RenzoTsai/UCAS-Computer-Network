@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from os import strerror
 import sys
 import string
 import socket
@@ -16,28 +17,33 @@ def server(port):
     
     cs, addr = s.accept()
     print addr
+
+    f = open('server-output.dat', 'wb')
     
     while True:
         data = cs.recv(1000)
-        print(type(data))
+        print len(data)
+        f.write(data)
         if data:
-            data = 'server echoes: ' + data
+            data = 'server echoes: ok'
             cs.send(data)
-        else:
+        if len(data) == 0:
             break
     
+    f.close()
     s.close()
 
 
 def client(ip, port):
     s = socket.socket()
     s.connect((ip, int(port)))
+    f = open('client-input.dat', 'r')
+    str = f.read()
     
-    for i in range(10):
-        s.send(data)
-        print s.recv(1000)
-        sleep(1)
-    
+    s.send(str)
+     
+
+    f.close()
     s.close()
 
 if __name__ == '__main__':

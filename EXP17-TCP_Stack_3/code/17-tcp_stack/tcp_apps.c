@@ -2,8 +2,8 @@
 
 #include "log.h"
 
-#include <stdlib.h>
 #include <unistd.h>
+#include<stdio.h>
 
 // tcp server application, listens to port (specified by arg) and serves only one
 // connection request
@@ -31,28 +31,26 @@ void *tcp_server(void *arg)
 
 	log(DEBUG, "accept a connection.");
 
-	char rbuf[1001];
-	char wbuf[1024];
-	int rlen = 0;
-	while (1) {
-		rlen = tcp_sock_read(csk, rbuf, 1000);
-		if (rlen == 0) {
-			log(DEBUG, "tcp_sock_read return 0, finish transmission.");
+	int rbuf_size = 5*1024*1024;
+	FILE *f = fopen("server-output.dat","w");
+	char* rbuf = (char*)malloc(rbuf_size);//5MB
+	int rlen=0;
+	int total_recv = 0;
+	while(1){
+		memset(rbuf, 0, rbuf_size);
+		rlen = tcp_sock_read(csk, rbuf, rbuf_size);
+		if (rlen <= 0) {
+			log(DEBUG, "tcp_sock_read return 0 value, finish transmission.");
 			break;
 		} 
 		else if (rlen > 0) {
 			rbuf[rlen] = '\0';
-			sprintf(wbuf, "server echoes: %s", rbuf);
-			if (tcp_sock_write(csk, wbuf, strlen(wbuf)) < 0) {
-				log(DEBUG, "tcp_sock_write return negative value, something goes wrong.");
-				exit(1);
-			}
-		}
-		else {
-			log(DEBUG, "tcp_sock_read return negative value, something goes wrong.");
-			exit(1);
+			fprintf(f, "%s", rbuf);
+			total_recv += rlen;
+			fprintf(stdout, "totally receive data: %d B\n", total_recv);
 		}
 	}
+	fclose(f);
 
 	log(DEBUG, "close this connection.");
 
@@ -67,6 +65,11 @@ void *tcp_client(void *arg)
 {
 	struct sock_addr *skaddr = arg;
 
+	FILE *f = fopen("client-input.dat","r");
+	char* wbuf = (char*)malloc(5*1024*1024);//4MB
+	int wlen = fread(wbuf, sizeof(char), 5*1024*1024, f);//fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+	fclose(f);
+
 	struct tcp_sock *tsk = alloc_tcp_sock();
 
 	if (tcp_sock_connect(tsk, skaddr) < 0) {
@@ -75,32 +78,11 @@ void *tcp_client(void *arg)
 		exit(1);
 	}
 
-	char *wbuf = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	int wlen = strlen(wbuf);
-	char rbuf[1001];
-	int rlen = 0;
-
-	int n = 10;
-	for (int i = 0; i < n; i++) {
-		if (tcp_sock_write(tsk, wbuf + i, wlen - n) < 0)
-			break;
-
-		rlen = tcp_sock_read(tsk, rbuf, 1000);
-		if (rlen == 0) {
-			log(DEBUG, "tcp_sock_read return 0, finish transmission.");
-			break;
-		}
-		else if (rlen > 0) {
-			rbuf[rlen] = '\0';
-			fprintf(stdout, "%s\n", rbuf);
-		}
-		else {
-			log(DEBUG, "tcp_sock_read return negative value, something goes wrong.");
-			exit(1);
-		}
-		sleep(1);
+	if(tcp_sock_write(tsk, wbuf, wlen)<0){
+		fprintf(stdout,"********** tcp_sock_write_error ****************");
 	}
-
+    sleep(5);
+	fprintf(stdout,"send over\n");
 	tcp_sock_close(tsk);
 
 	return NULL;
