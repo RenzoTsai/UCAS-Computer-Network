@@ -60,9 +60,9 @@ void *tcp_retrans_timer_thread(void *arg)
 // set the restrans timer of a tcp sock, by adding the timer into timer_list
 void tcp_set_retrans_timer(struct tcp_sock *tsk)
 {
-	printf("Set retrans timer here\n");
+	//printf("Set retrans timer here\n");
 	if (tsk->retrans_timer.enable) {
-		printf("Already set up one retrans timer");
+		//printf("Already set up one retrans timer");
 		return;
 	}
 	tsk->retrans_timer.type = 1;
@@ -75,7 +75,7 @@ void tcp_set_retrans_timer(struct tcp_sock *tsk)
 // update the restrans timer of a tcp sock
 void tcp_update_retrans_timer(struct tcp_sock *tsk)
 {
-	printf("Update retrans timer here\n");
+	//printf("Update retrans timer here\n");
 	if (!tsk->retrans_timer.enable) {
 		tcp_set_retrans_timer(tsk);
 	}
@@ -86,7 +86,7 @@ void tcp_update_retrans_timer(struct tcp_sock *tsk)
 
 void tcp_unset_retrans_timer(struct tcp_sock *tsk)
 {
-	printf("Delete retrans timer here\n");
+	//printf("Delete retrans timer here\n");
 	list_delete_entry(&tsk->retrans_timer.list);
 }
 
@@ -101,9 +101,9 @@ void tcp_scan_retrans_timer_list()
 		time_entry->timeout -= TCP_RETRANS_SCAN_INTERVAL;
 		tsk = retranstimer_to_tcp_sock(time_entry);
 		if (time_entry->timeout <= 0) {
-			if (time_entry->retrans_time != 3)
-				printf("retrans_time: %d\n", time_entry->retrans_time);
-			if(time_entry->retrans_time >= 3 && tsk->state != TCP_CLOSED){
+			//if (time_entry->retrans_time != 5)
+				//printf("retrans_time: %d\n", time_entry->retrans_time);
+			if(time_entry->retrans_time >= 5 && tsk->state != TCP_CLOSED){
 				list_delete_entry(&time_entry->list);
 				if (!tsk->parent) {
 					tcp_bind_unhash(tsk);
@@ -117,7 +117,7 @@ void tcp_scan_retrans_timer_list()
 				tcp_send_control_packet(tsk, TCP_RST);
 				//free_tcp_sock(tsk);
 			} else if (tsk->state != TCP_CLOSED) {
-				printf("\nTO RETRANS\n");
+				//printf("\nTO RETRANS\n");
 				time_entry->retrans_time += 1;
 				time_entry->timeout = TCP_RETRANS_INTERVAL_INITIAL * (2 << time_entry->retrans_time);
 				retrans_send_buffer_packet(tsk);

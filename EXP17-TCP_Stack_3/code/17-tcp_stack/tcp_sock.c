@@ -408,24 +408,26 @@ void send_data(struct tcp_sock *tsk, char *buf, int len) {
 
 int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	int single_len = 0;
-	int init_seq = tsk->snd_una;
-	int init_len = len;
+	// int init_seq = tsk->snd_una;
+	// int init_len = len;
+	int offset = 0;
 
 	tcp_set_retrans_timer(tsk);
 	while (len > 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
-		send_data(tsk, buf + (tsk->snd_una - init_seq), single_len);
+		send_data(tsk, buf + offset, single_len);
 		if (tsk->snd_wnd == 0) {
 			sleep_on(tsk->wait_send);
 		}
 		len -= single_len;
+		offset += single_len;
 	}
 
-	// while (!list_empty(tsk->send_buf)) { 
-	// 	sleep_on(tsk->wait_send);
-	// }
-
-	send_data(tsk, buf + (tsk->snd_una - init_seq), len);
+	send_data(tsk, buf + offset, len);
+	while (!list_empty(&tsk->send_buf)) { 
+		sleep_on(tsk->wait_send);
+	}
+	
 	tcp_unset_retrans_timer(tsk);
 	return init_len;
 }
@@ -433,7 +435,7 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 tcp_send_buffer_entry_t * alloc_send_buffer_entry(char *packet, int len) {
 	tcp_send_buffer_entry_t * entry = (tcp_send_buffer_entry_t *)malloc(sizeof(tcp_send_buffer_entry_t));
 	bzero(entry, sizeof(tcp_send_buffer_entry_t));
-	//init_list_head(&entry->list);
+	init_list_head(&entry->list);
 	entry->packet = (char *)malloc(len);
 	memcpy((char*)entry->packet, packet, len);
 	entry->len = len;
@@ -441,16 +443,16 @@ tcp_send_buffer_entry_t * alloc_send_buffer_entry(char *packet, int len) {
 }
 
 void add_send_buffer_entry(struct tcp_sock *tsk, char *packet, int len) {
-	printf("Add a send_buffer_entry here.\n");
+	//printf("Add a send_buffer_entry here.\n");
 	tcp_send_buffer_entry_t * entry = alloc_send_buffer_entry(packet, len);
-	struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
-	u32 seq = ntohl(tcp->seq);
-	printf("added seq: %d\n",seq);
+	// struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
+	// u32 seq = ntohl(tcp->seq);
+	// printf("added seq: %d\n",seq);
 	list_add_tail(&entry->list, &tsk->send_buf);
 }
 
 void delete_send_buffer_entry(struct tcp_sock *tsk, u32 ack) {
-	printf("Delete a send_buffer_entry here.\n");
+	//printf("Delete a send_buffer_entry here.\n");
 	tcp_send_buffer_entry_t * entry, * entry_q;
 	list_for_each_entry_safe(entry, entry_q, &tsk->send_buf, list) {
 		struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
@@ -464,7 +466,7 @@ void delete_send_buffer_entry(struct tcp_sock *tsk, u32 ack) {
 }
 
 void retrans_send_buffer_packet(struct tcp_sock *tsk) {
-	printf("Retrans a send_buffer_entry here.\n");
+	//printf("Retrans a send_buffer_entry here.\n");
 	if (list_empty(&tsk->send_buf)) {
 		return;
 	}
@@ -483,7 +485,7 @@ void retrans_send_buffer_packet(struct tcp_sock *tsk) {
 
 
 void add_recv_ofo_buf_entry(struct tcp_sock *tsk, struct tcp_cb *cb) {
-	printf("\nAdd a ofo_buffer_entry here.\n");
+	//printf("\nAdd a ofo_buffer_entry here.\n");
 	rcv_ofo_buf_entry_t * latest_ofo_entry = (rcv_ofo_buf_entry_t *)malloc(sizeof(rcv_ofo_buf_entry_t));
 	latest_ofo_entry->seq = cb->seq;
 	latest_ofo_entry->len = cb->pl_len;
