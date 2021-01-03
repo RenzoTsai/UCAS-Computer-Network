@@ -37,8 +37,9 @@ void init_tcp_stack()
 	for (int i = 0; i < TCP_HASH_SIZE; i++)
 		init_list_head(&tcp_bind_sock_table[i]);
 
-	pthread_t timer;
-	pthread_create(&timer, NULL, tcp_timer_thread, NULL);
+	pthread_t timer1, timer2;
+	pthread_create(&timer1, NULL, tcp_timer_thread, NULL);
+	pthread_create(&timer2, NULL, tcp_retrans_timer_thread, NULL);
 }
 
 // allocate tcp sock, and initialize all the variables that can be determined
@@ -55,6 +56,8 @@ struct tcp_sock *alloc_tcp_sock()
 	init_list_head(&tsk->list);
 	init_list_head(&tsk->listen_queue);
 	init_list_head(&tsk->accept_queue);
+	init_list_head(&tsk->send_buf);
+	init_list_head(&tsk->rcv_ofo_buf);
 
 	tsk->rcv_buf = alloc_ring_buffer(tsk->rcv_wnd);
 
@@ -62,6 +65,8 @@ struct tcp_sock *alloc_tcp_sock()
 	tsk->wait_accept = alloc_wait_struct();
 	tsk->wait_recv = alloc_wait_struct();
 	tsk->wait_send = alloc_wait_struct();
+
+	tsk->retrans_timer.enable = 0;
 
 	return tsk;
 }
@@ -278,6 +283,7 @@ int tcp_sock_connect(struct tcp_sock *tsk, struct sock_addr *skaddr)
 	tsk->sk_dport = ntohs(skaddr->port);
 	tcp_bind_hash(tsk);
 
+	tcp_set_retrans_timer(tsk);
 	tcp_send_control_packet(tsk, TCP_SYN);
 	tcp_set_state(tsk, TCP_SYN_SENT);
 	tcp_hash(tsk);
@@ -368,11 +374,13 @@ void tcp_sock_close(struct tcp_sock *tsk)
 {
 	fprintf(stdout, "TODO: implement %s here.\n", __FUNCTION__);
 	if (tsk->state == TCP_CLOSE_WAIT) {
+		tcp_set_retrans_timer(tsk);
 		tcp_send_control_packet(tsk, TCP_FIN|TCP_ACK);
 		tcp_set_state(tsk, TCP_LAST_ACK);
 	} else if (tsk->state == TCP_ESTABLISHED) {
 		tcp_set_state(tsk, TCP_FIN_WAIT_1);
 		printf("\n********** send FIN ***********\n");
+		tcp_set_retrans_timer(tsk);
 		tcp_send_control_packet(tsk, TCP_FIN|TCP_ACK);
 	} else {
 		tcp_unhash(tsk);
@@ -387,6 +395,7 @@ int tcp_sock_read(struct tcp_sock *tsk, char *buf, int len) {
 
 	int rlen = read_ring_buffer(tsk->rcv_buf, buf, len);
 	wake_up(tsk->wait_recv);
+	tcp_unset_retrans_timer(tsk);
 	return rlen;
 }
 
@@ -402,6 +411,7 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	int init_seq = tsk->snd_una;
 	int init_len = len;
 
+	tcp_set_retrans_timer(tsk);
 	while (len > 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
 		send_data(tsk, buf + (tsk->snd_una - init_seq), single_len);
@@ -411,6 +421,106 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 		len -= single_len;
 	}
 
+	// while (!list_empty(tsk->send_buf)) { 
+	// 	sleep_on(tsk->wait_send);
+	// }
+
 	send_data(tsk, buf + (tsk->snd_una - init_seq), len);
+	tcp_unset_retrans_timer(tsk);
 	return init_len;
+}
+
+tcp_send_buffer_entry_t * alloc_send_buffer_entry(char *packet, int len) {
+	tcp_send_buffer_entry_t * entry = (tcp_send_buffer_entry_t *)malloc(sizeof(tcp_send_buffer_entry_t));
+	bzero(entry, sizeof(tcp_send_buffer_entry_t));
+	//init_list_head(&entry->list);
+	entry->packet = (char *)malloc(len);
+	memcpy((char*)entry->packet, packet, len);
+	entry->len = len;
+	return entry;
+}
+
+void add_send_buffer_entry(struct tcp_sock *tsk, char *packet, int len) {
+	printf("Add a send_buffer_entry here.\n");
+	tcp_send_buffer_entry_t * entry = alloc_send_buffer_entry(packet, len);
+	struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
+	u32 seq = ntohl(tcp->seq);
+	printf("added seq: %d\n",seq);
+	list_add_tail(&entry->list, &tsk->send_buf);
+}
+
+void delete_send_buffer_entry(struct tcp_sock *tsk, u32 ack) {
+	printf("Delete a send_buffer_entry here.\n");
+	tcp_send_buffer_entry_t * entry, * entry_q;
+	list_for_each_entry_safe(entry, entry_q, &tsk->send_buf, list) {
+		struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
+		u32 seq = ntohl(tcp->seq);
+		if (less_than_32b(seq, ack)) {
+			list_delete_entry(&entry->list);
+			free(entry->packet);
+			free(entry);
+		}
+	}
+}
+
+void retrans_send_buffer_packet(struct tcp_sock *tsk) {
+	printf("Retrans a send_buffer_entry here.\n");
+	if (list_empty(&tsk->send_buf)) {
+		return;
+	}
+	tcp_send_buffer_entry_t * first_entry = list_entry(tsk->send_buf.next, tcp_send_buffer_entry_t, list);
+	char * packet = (char*)malloc(first_entry->len);
+	memcpy(packet, first_entry->packet, first_entry->len);
+	struct iphdr *ip = packet_to_ip_hdr(packet);
+	struct tcphdr *tcp = packet_to_tcp_hdr(packet);
+
+	tcp->ack = htonl(tsk->rcv_nxt);
+	tcp->checksum = tcp_checksum(ip, tcp);
+	ip->checksum = ip_checksum(ip);	
+
+	ip_send_packet(packet, first_entry->len);
+}
+
+
+void add_recv_ofo_buf_entry(struct tcp_sock *tsk, struct tcp_cb *cb) {
+	printf("\nAdd a ofo_buffer_entry here.\n");
+	rcv_ofo_buf_entry_t * latest_ofo_entry = (rcv_ofo_buf_entry_t *)malloc(sizeof(rcv_ofo_buf_entry_t));
+	latest_ofo_entry->seq = cb->seq;
+	latest_ofo_entry->len = cb->pl_len;
+	latest_ofo_entry->data = (char*)malloc(cb->pl_len);
+	memcpy(latest_ofo_entry->data, cb->payload, cb->pl_len);
+
+	rcv_ofo_buf_entry_t * entry, *entry_q;
+	list_for_each_entry_safe (entry, entry_q, &tsk->rcv_ofo_buf, list) {
+		if(less_than_32b(latest_ofo_entry->seq , entry->seq)) {
+			list_add_tail(&latest_ofo_entry->list, &entry->list);
+			return;
+		}
+	}
+	list_add_tail(&latest_ofo_entry->list, &tsk->rcv_ofo_buf);
+}
+
+int put_recv_ofo_buf_entry_to_ring_buf(struct tcp_sock *tsk) {
+	u32 seq = tsk->rcv_nxt;
+	rcv_ofo_buf_entry_t * entry, * entry_q;
+	list_for_each_entry_safe(entry, entry_q, &tsk->rcv_ofo_buf, list) {
+		if (seq == entry->seq) {
+			while(entry->len > ring_buffer_free(tsk->rcv_buf)) {
+				sleep_on(tsk->wait_recv);
+			}
+			printf("put a ofo_buffer_entry here.\n");
+			write_ring_buffer(tsk->rcv_buf, entry->data, entry->len);
+			wake_up(tsk->wait_recv);
+			seq += entry->len;
+			tsk->rcv_nxt = seq;
+			list_delete_entry(&entry->list);
+			free(entry->data);
+			free(entry);
+		} else if (less_than_32b(seq, entry->seq)) { 
+			break;
+		} else {
+			return -1;
+		}
+	}
+	return 0;
 }

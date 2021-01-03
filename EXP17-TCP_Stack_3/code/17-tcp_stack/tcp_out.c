@@ -56,6 +56,9 @@ void tcp_send_packet(struct tcp_sock *tsk, char *packet, int len)
 	tsk->snd_nxt += tcp_data_len;
 	tsk->snd_wnd -= tcp_data_len;
 
+	add_send_buffer_entry(tsk, packet, len);
+	tcp_update_retrans_timer(tsk);
+
 	ip_send_packet(packet, len);
 }
 
@@ -86,6 +89,12 @@ void tcp_send_control_packet(struct tcp_sock *tsk, u8 flags)
 
 	if (flags & (TCP_SYN|TCP_FIN))
 		tsk->snd_nxt += 1;
+
+
+	if((flags != TCP_ACK) && !(flags & TCP_RST)){ 
+		add_send_buffer_entry(tsk, packet, pkt_size);
+		tcp_update_retrans_timer(tsk);
+	}
 
 	ip_send_packet(packet, pkt_size);
 }

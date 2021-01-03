@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 static struct list_head timer_list;
+static struct list_head retrans_timer_list;
 
 // scan the timer_list, find the tcp sock which stays for at 2*MSL, release it
 void tcp_scan_timer_list()
@@ -42,4 +43,85 @@ void *tcp_timer_thread(void *arg)
 	}
 
 	return NULL;
+}
+
+// scan the restrans_timer_list periodically by calling tcp_scan_retrans_timer_list
+void *tcp_retrans_timer_thread(void *arg)
+{
+	init_list_head(&retrans_timer_list);
+	while(1){
+		usleep(TCP_RETRANS_SCAN_INTERVAL);
+		tcp_scan_retrans_timer_list();
+	}
+
+	return NULL;
+}
+
+// set the restrans timer of a tcp sock, by adding the timer into timer_list
+void tcp_set_retrans_timer(struct tcp_sock *tsk)
+{
+	printf("Set retrans timer here\n");
+	if (tsk->retrans_timer.enable) {
+		printf("Already set up one retrans timer");
+		return;
+	}
+	tsk->retrans_timer.type = 1;
+	tsk->timewait.timeout = TCP_RETRANS_INTERVAL_INITIAL;
+	tsk->retrans_timer.retrans_time = 0;
+	init_list_head(&tsk->retrans_timer.list);
+	list_add_tail(&tsk->retrans_timer.list, &retrans_timer_list);
+}
+
+// update the restrans timer of a tcp sock
+void tcp_update_retrans_timer(struct tcp_sock *tsk)
+{
+	printf("Update retrans timer here\n");
+	if (!tsk->retrans_timer.enable) {
+		tcp_set_retrans_timer(tsk);
+	}
+	tsk->retrans_timer.type = 1;
+	tsk->timewait.timeout = TCP_RETRANS_INTERVAL_INITIAL;
+	tsk->retrans_timer.retrans_time  = 0;
+}
+
+void tcp_unset_retrans_timer(struct tcp_sock *tsk)
+{
+	printf("Delete retrans timer here\n");
+	list_delete_entry(&tsk->retrans_timer.list);
+}
+
+void tcp_scan_retrans_timer_list()
+{
+	struct tcp_sock *tsk;
+	struct tcp_timer * time_entry, *time_q;
+	// if(list_empty(&retrans_timer_list)){
+	// 	printf("****timer empty****\n");
+	// }
+	list_for_each_entry_safe(time_entry, time_q, &retrans_timer_list, list) {
+		time_entry->timeout -= TCP_RETRANS_SCAN_INTERVAL;
+		tsk = retranstimer_to_tcp_sock(time_entry);
+		if (time_entry->timeout <= 0) {
+			if (time_entry->retrans_time != 3)
+				printf("retrans_time: %d\n", time_entry->retrans_time);
+			if(time_entry->retrans_time >= 3 && tsk->state != TCP_CLOSED){
+				list_delete_entry(&time_entry->list);
+				if (!tsk->parent) {
+					tcp_bind_unhash(tsk);
+				}	
+				wait_exit(tsk->wait_connect);
+				wait_exit(tsk->wait_accept);
+				wait_exit(tsk->wait_recv);
+				wait_exit(tsk->wait_send);
+				
+				tcp_set_state(tsk, TCP_CLOSED);
+				tcp_send_control_packet(tsk, TCP_RST);
+				//free_tcp_sock(tsk);
+			} else if (tsk->state != TCP_CLOSED) {
+				printf("\nTO RETRANS\n");
+				time_entry->retrans_time += 1;
+				time_entry->timeout = TCP_RETRANS_INTERVAL_INITIAL * (2 << time_entry->retrans_time);
+				retrans_send_buffer_packet(tsk);
+			}
+		}
+	}
 }

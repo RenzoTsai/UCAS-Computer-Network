@@ -112,6 +112,20 @@ struct tcp_sock {
 	u32 ssthresh;
 };
 
+
+typedef struct {
+	struct list_head list;
+	char * packet;
+	int len;
+} tcp_send_buffer_entry_t;
+
+typedef struct {
+	struct list_head list;
+	char * data;
+	int len;
+	int seq;
+} rcv_ofo_buf_entry_t;
+
 void tcp_set_state(struct tcp_sock *tsk, int state);
 
 int tcp_sock_accept_queue_full(struct tcp_sock *tsk);
@@ -148,5 +162,12 @@ void tcp_sock_close(struct tcp_sock *tsk);
 
 int tcp_sock_read(struct tcp_sock *tsk, char *buf, int len);
 int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len);
+
+void add_send_buffer_entry(struct tcp_sock *tsk, char *packet, int len);
+void delete_send_buffer_entry(struct tcp_sock *tsk, u32 ack);
+void retrans_send_buffer_packet(struct tcp_sock *tsk);
+
+void add_recv_ofo_buf_entry(struct tcp_sock *tsk, struct tcp_cb *cb);
+int put_recv_ofo_buf_entry_to_ring_buf(struct tcp_sock *tsk);
 
 #endif
