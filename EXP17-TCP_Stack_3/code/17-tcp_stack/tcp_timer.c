@@ -101,8 +101,8 @@ void tcp_scan_retrans_timer_list()
 		time_entry->timeout -= TCP_RETRANS_SCAN_INTERVAL;
 		tsk = retranstimer_to_tcp_sock(time_entry);
 		if (time_entry->timeout <= 0) {
-			//if (time_entry->retrans_time != 5)
-				//printf("retrans_time: %d\n", time_entry->retrans_time);
+			if (time_entry->retrans_time != 5)
+				printf("retrans_time: %d\n", time_entry->retrans_time);
 			if(time_entry->retrans_time >= 5 && tsk->state != TCP_CLOSED){
 				list_delete_entry(&time_entry->list);
 				if (!tsk->parent) {

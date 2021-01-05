@@ -409,7 +409,7 @@ void send_data(struct tcp_sock *tsk, char *buf, int len) {
 int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	int single_len = 0;
 	// int init_seq = tsk->snd_una;
-	// int init_len = len;
+	int init_len = len;
 	int offset = 0;
 
 	tcp_set_retrans_timer(tsk);
@@ -423,10 +423,11 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 		offset += single_len;
 	}
 
-	send_data(tsk, buf + offset, len);
 	while (!list_empty(&tsk->send_buf)) { 
 		sleep_on(tsk->wait_send);
 	}
+
+	send_data(tsk, buf + offset, len);
 	
 	tcp_unset_retrans_timer(tsk);
 	return init_len;
@@ -435,7 +436,7 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 tcp_send_buffer_entry_t * alloc_send_buffer_entry(char *packet, int len) {
 	tcp_send_buffer_entry_t * entry = (tcp_send_buffer_entry_t *)malloc(sizeof(tcp_send_buffer_entry_t));
 	bzero(entry, sizeof(tcp_send_buffer_entry_t));
-	init_list_head(&entry->list);
+	//init_list_head(&entry->list);
 	entry->packet = (char *)malloc(len);
 	memcpy((char*)entry->packet, packet, len);
 	entry->len = len;

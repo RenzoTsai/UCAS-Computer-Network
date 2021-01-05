@@ -66,8 +66,9 @@ void *tcp_client(void *arg)
 	struct sock_addr *skaddr = arg;
 
 	FILE *f = fopen("client-input.dat","r");
-	char* wbuf = (char*)malloc(5*1024*1024);//4MB
-	int wlen = fread(wbuf, sizeof(char), 5*1024*1024, f);//fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+	char* wbuf = (char*)malloc(5*1024*1024);
+	fseek(f,0,0);
+	int wlen = fread(wbuf, sizeof(char), 5*1024*1024, f);
 	fclose(f);
 
 	struct tcp_sock *tsk = alloc_tcp_sock();
