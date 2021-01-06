@@ -42,7 +42,7 @@ void *tcp_server(void *arg)
 		memset(rbuf, 0, rbuf_size);
 		rlen = tcp_sock_read(csk, rbuf, rbuf_size);
 		if (rlen <= 0) {
-			log(DEBUG, "tcp_sock_read return 0 value, finish transmission.");
+			log(DEBUG, "tcp_sock_read return 0, finish transmission.");
 			break;
 		} 
 		else if (rlen > 0) {
@@ -86,9 +86,9 @@ void *tcp_client(void *arg)
 	}
 
 	if(tcp_sock_write(tsk, wbuf, wlen) < 0){
-		fprintf(stdout,"********** tcp_sock_write_error ****************");
+		fprintf(stdout,"tcp_sock_write_error.");
 	}
-    sleep(5);
+
 	tcp_sock_close(tsk);
 
 	return NULL;

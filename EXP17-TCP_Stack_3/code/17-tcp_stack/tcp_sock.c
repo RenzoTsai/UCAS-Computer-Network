@@ -412,6 +412,7 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	int offset = 0;
 
 	tcp_set_retrans_timer(tsk);
+	
 	while (len > 0) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
 		send_data(tsk, buf + offset, single_len);
@@ -443,9 +444,6 @@ tcp_send_buffer_entry_t * alloc_send_buffer_entry(char *packet, int len) {
 void add_send_buffer_entry(struct tcp_sock *tsk, char *packet, int len) {
 	//printf("Add a send_buffer_entry here.\n");
 	tcp_send_buffer_entry_t * entry = alloc_send_buffer_entry(packet, len);
-	// struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
-	// u32 seq = ntohl(tcp->seq);
-	// printf("added seq: %d\n",seq);
 	list_add_tail(&entry->list, &tsk->send_buf);
 }
 
