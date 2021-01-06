@@ -67,9 +67,10 @@ void handle_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb) {
 		sleep_on(tsk->wait_recv);
 	}
 	if (less_than_32b(cb->seq, tsk->rcv_nxt)) {
+		tcp_send_control_packet(tsk, TCP_ACK);
 		return;
 	}
-	printf("handle recv data\n");
+	//printf("handle recv data\n");
 	add_recv_ofo_buf_entry(tsk, cb);
 	put_recv_ofo_buf_entry_to_ring_buf(tsk);
 	tsk->snd_una = (greater_than_32b(cb->ack, tsk->snd_una))?cb->ack :tsk->snd_una;
@@ -85,7 +86,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	
 	printf("flags: 0x%x\n",tcp->flags);
 	printf("state: %s\n",tcp_state_to_str(tsk->state));
-	printf("rcv_nxt:%u, ack:%u, seq:%u\n", tsk->rcv_nxt, cb->ack, cb->seq);
+	printf("rcv_nxt:%u, ack:%u, seq:%u, len:%d\n", tsk->rcv_nxt, cb->ack, cb->seq, cb->pl_len);
 
 	if (tcp->flags & TCP_RST) {
 		tcp_sock_close(tsk);
@@ -133,21 +134,32 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 
 	if (tsk->state == TCP_ESTABLISHED) {
 		if (tcp->flags & TCP_FIN) {
+			if (!is_tcp_seq_valid(tsk,cb)) {
+				return;
+			}
 			tcp_unset_retrans_timer(tsk);
 			tcp_set_state(tsk, TCP_CLOSE_WAIT);
 			tsk->rcv_nxt = cb->seq + 1;
 			tcp_send_control_packet(tsk, TCP_ACK);
 		} else if (tcp->flags & TCP_ACK) {
-			if (!is_tcp_seq_valid(tsk,cb)) {
-				return;
-			}
 			if (cb->pl_len == 0) {
+				// for sender
 				tsk->rcv_nxt = cb->seq;
 				tsk->snd_una = cb->ack;
 				tcp_update_window_safe(tsk, cb);
 				delete_send_buffer_entry(tsk, cb->ack);
 				tcp_update_retrans_timer(tsk);
 			} else {
+				// for receiver
+				if (!is_tcp_seq_valid(tsk,cb)) {
+				// 	printf("1:%u, 2:%u\n", cb->seq + cb->pl_len, tsk->rcv_nxt);
+				// 	if (less_or_equal_32b(cb->seq + cb->pl_len, tsk->rcv_nxt) 
+				//  	 && greater_or_equal_32b(cb->seq + cb->pl_len, tsk->rcv_nxt)) {
+				// 		  printf("in: re-sent ACK\n");
+				// 		  tcp_send_control_packet(tsk, TCP_ACK);
+				// 	}
+					//return;
+				}
 				handle_recv_data(tsk, cb);
 			}	
 		}

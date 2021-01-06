@@ -115,9 +115,8 @@ void tcp_scan_retrans_timer_list()
 				
 				tcp_set_state(tsk, TCP_CLOSED);
 				tcp_send_control_packet(tsk, TCP_RST);
-				//free_tcp_sock(tsk);
 			} else if (tsk->state != TCP_CLOSED) {
-				//printf("\nTO RETRANS\n");
+				printf("\n***RETRANS***\n");
 				time_entry->retrans_time += 1;
 				time_entry->timeout = TCP_RETRANS_INTERVAL_INITIAL * (2 << time_entry->retrans_time);
 				retrans_send_buffer_packet(tsk);

@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include<stdio.h>
 
+#define SENT_SIZE 405264
+
 // tcp server application, listens to port (specified by arg) and serves only one
 // connection request
 void *tcp_server(void *arg)
@@ -31,12 +33,12 @@ void *tcp_server(void *arg)
 
 	log(DEBUG, "accept a connection.");
 
-	int rbuf_size = 5*1024*1024;
-	FILE *f = fopen("server-output.dat","w");
-	char* rbuf = (char*)malloc(rbuf_size);//5MB
-	int rlen=0;
-	int total_recv = 0;
-	while(1){
+	int rbuf_size = SENT_SIZE + 1;
+	FILE * fd = fopen("server-output.dat","w");
+	char * rbuf = (char*)malloc(rbuf_size);
+	int rlen = 0;
+	int recv_len = 0;
+	while (1) {
 		memset(rbuf, 0, rbuf_size);
 		rlen = tcp_sock_read(csk, rbuf, rbuf_size);
 		if (rlen <= 0) {
@@ -45,12 +47,16 @@ void *tcp_server(void *arg)
 		} 
 		else if (rlen > 0) {
 			rbuf[rlen] = '\0';
-			fprintf(f, "%s", rbuf);
-			total_recv += rlen;
-			fprintf(stdout, "totally receive data: %d B\n", total_recv);
+			fprintf(fd, "%s", rbuf);
+			recv_len += rlen;
+			fprintf(stdout, "received data: %d B\n", recv_len);
+			if (rlen < 1460) {
+				printf("%s\n",rbuf);
+				break;
+			}
 		}
 	}
-	fclose(f);
+	fclose(fd);
 
 	log(DEBUG, "close this connection.");
 
@@ -65,11 +71,11 @@ void *tcp_client(void *arg)
 {
 	struct sock_addr *skaddr = arg;
 
-	FILE *f = fopen("client-input.dat","r");
-	char* wbuf = (char*)malloc(5*1024*1024);
-	fseek(f,0,0);
-	int wlen = fread(wbuf, sizeof(char), 5*1024*1024, f);
-	fclose(f);
+	FILE * fd = fopen("client-input.dat","r");
+	char * wbuf = (char*)malloc(SENT_SIZE + 1);
+	fseek(fd,0,0);
+	int wlen = fread(wbuf, sizeof(char), SENT_SIZE, fd);
+	fclose(fd);
 
 	struct tcp_sock *tsk = alloc_tcp_sock();
 
@@ -79,11 +85,10 @@ void *tcp_client(void *arg)
 		exit(1);
 	}
 
-	if(tcp_sock_write(tsk, wbuf, wlen)<0){
+	if(tcp_sock_write(tsk, wbuf, wlen) < 0){
 		fprintf(stdout,"********** tcp_sock_write_error ****************");
 	}
     sleep(5);
-	fprintf(stdout,"send over\n");
 	tcp_sock_close(tsk);
 
 	return NULL;

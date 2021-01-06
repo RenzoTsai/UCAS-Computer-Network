@@ -382,7 +382,7 @@ void tcp_sock_close(struct tcp_sock *tsk)
 		printf("\n********** send FIN ***********\n");
 		tcp_set_retrans_timer(tsk);
 		tcp_send_control_packet(tsk, TCP_FIN|TCP_ACK);
-	} else {
+	} else if (tsk->state != TCP_CLOSED){
 		tcp_unhash(tsk);
 		tcp_set_state(tsk, TCP_CLOSED);
 	}
@@ -408,15 +408,14 @@ void send_data(struct tcp_sock *tsk, char *buf, int len) {
 
 int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	int single_len = 0;
-	// int init_seq = tsk->snd_una;
 	int init_len = len;
 	int offset = 0;
 
 	tcp_set_retrans_timer(tsk);
-	while (len > 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE) {
+	while (len > 0) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
 		send_data(tsk, buf + offset, single_len);
-		if (tsk->snd_wnd == 0) {
+		if (tsk->snd_wnd <= 0) {
 			sleep_on(tsk->wait_send);
 		}
 		len -= single_len;
@@ -426,8 +425,6 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	while (!list_empty(&tsk->send_buf)) { 
 		sleep_on(tsk->wait_send);
 	}
-
-	send_data(tsk, buf + offset, len);
 	
 	tcp_unset_retrans_timer(tsk);
 	return init_len;
@@ -479,7 +476,11 @@ void retrans_send_buffer_packet(struct tcp_sock *tsk) {
 
 	tcp->ack = htonl(tsk->rcv_nxt);
 	tcp->checksum = tcp_checksum(ip, tcp);
-	ip->checksum = ip_checksum(ip);	
+	ip->checksum = ip_checksum(ip);
+	int tcp_data_len = ntohs(ip->tot_len) - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE;
+
+	tsk->snd_wnd -= tcp_data_len;
+	printf("retrans seq: %u\n", ntohl(tcp->seq));
 
 	ip_send_packet(packet, first_entry->len);
 }
@@ -511,7 +512,7 @@ int put_recv_ofo_buf_entry_to_ring_buf(struct tcp_sock *tsk) {
 			while(entry->len > ring_buffer_free(tsk->rcv_buf)) {
 				sleep_on(tsk->wait_recv);
 			}
-			printf("put a ofo_buffer_entry here.\n");
+			//printf("put a ofo_buffer_entry here.\n");
 			write_ring_buffer(tsk->rcv_buf, entry->data, entry->len);
 			wake_up(tsk->wait_recv);
 			seq += entry->len;
