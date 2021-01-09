@@ -66,7 +66,7 @@ void tcp_set_retrans_timer(struct tcp_sock *tsk)
 		return;
 	}
 	tsk->retrans_timer.type = 1;
-	tsk->timewait.timeout = TCP_RETRANS_INTERVAL_INITIAL;
+	tsk->retrans_timer.timeout = TCP_RETRANS_INTERVAL_INITIAL;
 	tsk->retrans_timer.retrans_time = 0;
 	init_list_head(&tsk->retrans_timer.list);
 	list_add_tail(&tsk->retrans_timer.list, &retrans_timer_list);
@@ -80,7 +80,7 @@ void tcp_update_retrans_timer(struct tcp_sock *tsk)
 		tcp_set_retrans_timer(tsk);
 	}
 	tsk->retrans_timer.type = 1;
-	tsk->timewait.timeout = TCP_RETRANS_INTERVAL_INITIAL;
+	tsk->retrans_timer.timeout = TCP_RETRANS_INTERVAL_INITIAL;
 	tsk->retrans_timer.retrans_time  = 0;
 }
 
