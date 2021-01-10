@@ -82,7 +82,7 @@ void tcp_new_reno_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	int isNewAck  = delete_send_buffer_entry(tsk, cb->ack);
 	printf("***********RENO**********");
 	if (isNewAck) {
-		tsk->dupacks --;
+		//tsk->dupacks --;
 		if (tsk->nr_state == TCP_OPEN 	  || tsk->nr_state == TCP_DISORDER 
 		 || tsk->nr_state == TCP_RECOVERY || tsk->nr_state == TCP_LOSS) {
 			if ((int)tsk->cwnd < tsk->ssthresh) {
@@ -129,9 +129,10 @@ void tcp_new_reno_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 			}
 		} else {
 			if (tsk->nr_state == TCP_RECOVERY) {
-				if (tsk->dupacks == 3) {
+				if (tsk->dupacks >= 3) {
 					tsk->ssthresh = max((u32)(tsk->cwnd / 2), 1);
-					tsk->cwnd -= 0.5;
+					// tsk->cwnd -= 0.5;
+					tsk->cwnd = tsk->ssthresh;
 					printf("cwnd-:%f\n",tsk->cwnd);
 					tsk->cwnd_flag = 0;
 					tsk->recovery_point = tsk->snd_nxt;

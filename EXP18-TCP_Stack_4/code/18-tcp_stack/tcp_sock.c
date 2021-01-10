@@ -441,7 +441,7 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
 		send_data(tsk, buf + offset, single_len);
 		//if (tsk->snd_wnd <= 0) {
-		if (is_allow_to_send(tsk) == 0) {
+		while (is_allow_to_send(tsk) == 0) {
 			sleep_on(tsk->wait_send);
 		}
 		len -= single_len;
