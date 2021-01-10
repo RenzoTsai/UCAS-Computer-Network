@@ -135,8 +135,8 @@ void *tcp_cwnd_record_thread(void *arg) {
 	struct tcp_sock *tsk = (struct tcp_sock *)arg;
 	FILE *fd = fopen("cwnd.csv", "w");
 	double i = 0;
-	while (tsk->state != TCP_TIME_WAIT) {
-		usleep(50);
+	while (tsk->state != TCP_TIME_WAIT && tsk->parent == NULL) {
+		usleep(100);
 		i++;
 		fprintf(fd, "%f,%f\n",i/10000, tsk->cwnd);
 	}

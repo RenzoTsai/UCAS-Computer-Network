@@ -17,7 +17,6 @@ struct tcp_hash_table tcp_sock_table;
 #define tcp_listen_sock_table		tcp_sock_table.listen_table
 #define tcp_bind_sock_table			tcp_sock_table.bind_table
 
-#define MSS (1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE)
 
 #ifndef max
 #	define max(x,y) ((x)>(y) ? (x) : (y))
@@ -62,9 +61,13 @@ struct tcp_sock *alloc_tcp_sock()
 
 	tsk->state = TCP_CLOSED;
 	tsk->nr_state = TCP_OPEN;
+
+	tsk->cwnd = 1;
+	tsk->ssthresh = 16;
 	tsk->dupacks = 0;
 	tsk->rcv_wnd = TCP_DEFAULT_WINDOW;
 	tsk->snd_wnd = TCP_DEFAULT_WINDOW;
+	tsk->adv_wnd = TCP_DEFAULT_WINDOW;
 
 	init_list_head(&tsk->list);
 	init_list_head(&tsk->listen_queue);
@@ -425,7 +428,7 @@ void send_data(struct tcp_sock *tsk, char *buf, int len) {
 }
 
 int is_allow_to_send (struct tcp_sock *tsk) {
-	tsk->snd_wnd = min(tsk->adv_wnd, tsk->cwnd);
+	//tsk->snd_wnd = min(tsk->adv_wnd, tsk->cwnd*MSS);
 	int inflight = (tsk->snd_nxt - tsk->snd_una)/MSS - tsk->dupacks;
 	return max(tsk->snd_wnd / MSS - inflight, 0);
 }
@@ -535,14 +538,15 @@ int put_recv_ofo_buf_entry_to_ring_buf(struct tcp_sock *tsk) {
 	rcv_ofo_buf_entry_t * entry, * entry_q;
 	list_for_each_entry_safe(entry, entry_q, &tsk->rcv_ofo_buf, list) {
 		if (seq == entry->seq) {
+			seq += entry->len;
+			tsk->rcv_nxt = seq;
+			tcp_send_control_packet(tsk, TCP_ACK);
 			while(entry->len > ring_buffer_free(tsk->rcv_buf)) {
 				sleep_on(tsk->wait_recv);
 			}
 			//printf("put a ofo_buffer_entry here.\n");
 			write_ring_buffer(tsk->rcv_buf, entry->data, entry->len);
 			wake_up(tsk->wait_recv);
-			seq += entry->len;
-			tsk->rcv_nxt = seq;
 			list_delete_entry(&entry->list);
 			free(entry->data);
 			free(entry);

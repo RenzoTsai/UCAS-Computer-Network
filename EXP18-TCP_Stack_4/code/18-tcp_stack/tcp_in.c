@@ -12,7 +12,8 @@
 static inline void tcp_update_window(struct tcp_sock *tsk, struct tcp_cb *cb)
 {
 	u16 old_snd_wnd = tsk->snd_wnd;
-	tsk->snd_wnd = cb->rwnd;
+	//tsk->snd_wnd = cb->rwnd;
+	tsk->snd_wnd = min(cb->rwnd, tsk->cwnd * MSS);
 	if ((int)old_snd_wnd <= 0) {
 		wake_up(tsk->wait_send);
 		// printf("update windows\n");
@@ -73,9 +74,10 @@ void handle_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb) {
 	//printf("handle recv data\n");
 	add_recv_ofo_buf_entry(tsk, cb);
 	put_recv_ofo_buf_entry_to_ring_buf(tsk);
+	//tcp_send_control_packet(tsk, TCP_ACK);
 	tsk->snd_una = (greater_than_32b(cb->ack, tsk->snd_una))?cb->ack :tsk->snd_una;
 	tcp_update_retrans_timer(tsk);
-	tcp_send_control_packet(tsk, TCP_ACK);
+	
 }
 
 void tcp_new_reno_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet) {
@@ -129,10 +131,10 @@ void tcp_new_reno_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 			}
 		} else {
 			if (tsk->nr_state == TCP_RECOVERY) {
-				if (tsk->dupacks >= 3) {
+				if (tsk->dupacks == 3) {
 					tsk->ssthresh = max((u32)(tsk->cwnd / 2), 1);
-					// tsk->cwnd -= 0.5;
-					tsk->cwnd = tsk->ssthresh;
+					tsk->cwnd -= 0.5;
+					//tsk->cwnd = tsk->ssthresh;
 					printf("cwnd-:%f\n",tsk->cwnd);
 					tsk->cwnd_flag = 0;
 					tsk->recovery_point = tsk->snd_nxt;
@@ -160,9 +162,10 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 {
 	struct tcphdr * tcp = packet_to_tcp_hdr(packet);
 	
-	// printf("flags: 0x%x\n",tcp->flags);
-	// printf("state: %s\n",tcp_state_to_str(tsk->state));
+	printf("flags: 0x%x\n",tcp->flags);
+	printf("state: %s\n",tcp_state_to_str(tsk->state));
 	printf("rcv_nxt:%u, ack:%u, seq:%u, len:%d\n", tsk->rcv_nxt, cb->ack, cb->seq, cb->pl_len);
+	tsk->adv_wnd = cb->rwnd;
 
 	if (tcp->flags & TCP_RST) {
 		tcp_sock_close(tsk);
@@ -186,9 +189,9 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 			delete_send_buffer_entry(tsk, cb->ack);
 			tcp_unset_retrans_timer(tsk);
 			tcp_set_state(tsk, TCP_ESTABLISHED);
-			tsk->nr_state = TCP_OPEN;
-			tsk->cwnd = 1;
-			tsk->ssthresh = 16;
+			// tsk->nr_state = TCP_OPEN;
+			// tsk->cwnd = 1;
+			// tsk->ssthresh = 16;
 			tcp_send_control_packet(tsk, TCP_ACK);	
 			wake_up(tsk->wait_connect);	
 		}
