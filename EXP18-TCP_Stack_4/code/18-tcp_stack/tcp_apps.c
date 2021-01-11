@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include<stdio.h>
 
-#define SENT_SIZE 405264
+#define SENT_SIZE 1350880
 
 // tcp server application, listens to port (specified by arg) and serves only one
 // connection request

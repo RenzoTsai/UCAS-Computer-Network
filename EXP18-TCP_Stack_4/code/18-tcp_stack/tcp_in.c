@@ -80,24 +80,75 @@ void handle_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb) {
 	
 }
 
+void update_cwnd(struct tcp_sock *tsk) {
+	if ((int)tsk->cwnd < tsk->ssthresh) {
+		tsk->cwnd ++;
+		printf("cwnd+1:%f\n",tsk->cwnd);
+	} else {
+		tsk->cwnd += 1.0/tsk->cwnd;
+		printf("cwnd+1/:%f\n",tsk->cwnd);
+	}
+}
+
 void tcp_new_reno_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet) {
 	int isNewAck  = delete_send_buffer_entry(tsk, cb->ack);
 	printf("***********RENO**********");
-	if (isNewAck) {
-		//tsk->dupacks --;
-		if (tsk->nr_state == TCP_OPEN 	  || tsk->nr_state == TCP_DISORDER 
-		 || tsk->nr_state == TCP_RECOVERY || tsk->nr_state == TCP_LOSS) {
-			if ((int)tsk->cwnd < tsk->ssthresh) {
-				tsk->cwnd ++;
-				printf("cwnd+1:%f\n",tsk->cwnd);
-			} else {
-				tsk->cwnd += 1.0/tsk->cwnd;
-				printf("cwnd+1/:%f\n",tsk->cwnd);
-			}
-			if (tsk->nr_state != TCP_LOSS || cb->ack >= tsk->loss_point) {
+	if (tsk->nr_state == TCP_OPEN) {
+		if (isNewAck) {
+			update_cwnd(tsk);
+		} else {
+			tsk->dupacks ++;
+			update_cwnd(tsk);
+			tsk->nr_state = TCP_DISORDER;
+		}
+		return;
+	}
+	if (tsk->nr_state == TCP_DISORDER) {
+		if (isNewAck) {
+			update_cwnd(tsk);
+			tsk->nr_state = TCP_OPEN;
+			tsk->dupacks = 0;
+		} else {
+			tsk->dupacks ++;
+			update_cwnd(tsk);
+			tsk->nr_state = TCP_RECOVERY;
+		}
+		return;	
+	}
+	if (tsk->nr_state == TCP_LOSS) {
+		if (isNewAck) {
+			update_cwnd(tsk);
+			if (cb->ack >= tsk->loss_point) {
 				tsk->nr_state = TCP_OPEN;
+				tsk->dupacks = 0;
 			}
-		} else if (tsk->nr_state == TCP_FR) {
+		} else {
+			tsk->dupacks ++;
+			update_cwnd(tsk);
+		}
+		return;
+	}
+	if (tsk->nr_state == TCP_RECOVERY) {
+		if (isNewAck) {
+			update_cwnd(tsk);
+			tsk->nr_state = TCP_OPEN;
+			tsk->dupacks = 0;
+		} else {
+			tsk->dupacks ++;
+			if (tsk->dupacks == 3) {
+				tsk->ssthresh = max((u32)(tsk->cwnd / 2), 1);
+				tsk->cwnd -= 0.5;
+				printf("cwnd-:%f\n",tsk->cwnd);
+				tsk->cwnd_flag = 0;
+				tsk->recovery_point = tsk->snd_nxt;
+				retrans_send_buffer_packet(tsk);
+				tsk->nr_state = TCP_FR;
+			}
+		}
+		return;
+	}
+	if (tsk->nr_state == TCP_FR) {
+		if (isNewAck) {
 			if (tsk->cwnd_flag == 1) {
 				tsk->cwnd += 1.0/tsk->cwnd;
 				printf("cwnd+1:%f\n",tsk->cwnd);
@@ -106,52 +157,23 @@ void tcp_new_reno_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 				printf("cwnd-:%f\n",tsk->cwnd);
 			} else {
 				tsk->cwnd_flag = 1;
-			}       
+			}
 			if (cb->ack < tsk->recovery_point) {
 				retrans_send_buffer_packet(tsk);
 			} else {
 				tsk->nr_state = TCP_OPEN;
 				tsk->dupacks = 0;
 			}
-		}
-	} else {
-		tsk->dupacks ++;
-		if (tsk->nr_state == TCP_OPEN || tsk->nr_state == TCP_DISORDER || tsk->nr_state == TCP_LOSS) {
-			if ((int)tsk->cwnd < tsk->ssthresh) {
-				tsk->cwnd ++;
-				printf("cwnd+1:%f\n",tsk->cwnd);
-			} else {
-				tsk->cwnd += 1.0/tsk->cwnd;
-				printf("cwnd+1/:%f\n",tsk->cwnd);
-			}
-			if (tsk->nr_state == TCP_OPEN) {
-				tsk->nr_state = TCP_DISORDER;
-			} else if (tsk->nr_state == TCP_DISORDER) {
-				tsk->nr_state = TCP_RECOVERY;
-			}
 		} else {
-			if (tsk->nr_state == TCP_RECOVERY) {
-				if (tsk->dupacks == 3) {
-					tsk->ssthresh = max((u32)(tsk->cwnd / 2), 1);
-					tsk->cwnd -= 0.5;
-					//tsk->cwnd = tsk->ssthresh;
-					printf("cwnd-:%f\n",tsk->cwnd);
-					tsk->cwnd_flag = 0;
-					tsk->recovery_point = tsk->snd_nxt;
-					retrans_send_buffer_packet(tsk);
-					tsk->nr_state = TCP_FR;
-				}
-			}
-			if (tsk->nr_state == TCP_FR) {
-				if (tsk->cwnd_flag == 1) {
-					tsk->cwnd += (1.0/tsk->cwnd);
-					printf("cwnd+1/:%f\n",tsk->cwnd);
-				} else if (tsk->cwnd > tsk->ssthresh) {
-					tsk->cwnd -= 0.5;
-					printf("cwnd-:%f\n",tsk->cwnd);
-				} else {
-					tsk->cwnd_flag = 1;
-				}
+			tsk->dupacks ++;
+			if (tsk->cwnd_flag == 1) {
+				tsk->cwnd += 1.0/tsk->cwnd;
+				printf("cwnd+1:%f\n",tsk->cwnd);
+			} else if (tsk->cwnd > tsk->ssthresh) {
+				tsk->cwnd -= 0.5;
+				printf("cwnd-:%f\n",tsk->cwnd);
+			} else {
+				tsk->cwnd_flag = 1;
 			}
 		}
 	}

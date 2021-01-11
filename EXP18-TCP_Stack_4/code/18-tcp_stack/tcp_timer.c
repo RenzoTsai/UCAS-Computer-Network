@@ -105,7 +105,7 @@ void tcp_scan_retrans_timer_list()
 		time_entry->timeout -= TCP_RETRANS_SCAN_INTERVAL;
 		tsk = retranstimer_to_tcp_sock(time_entry);
 		if (time_entry->timeout <= 0) {
-			if(time_entry->retrans_time >= 5 && tsk->state != TCP_CLOSED){
+			if(time_entry->retrans_time >= 8 && tsk->state != TCP_CLOSED){
 				list_delete_entry(&time_entry->list);
 				if (!tsk->parent) {
 					tcp_bind_unhash(tsk);
@@ -134,6 +134,7 @@ void tcp_scan_retrans_timer_list()
 void *tcp_cwnd_record_thread(void *arg) {
 	struct tcp_sock *tsk = (struct tcp_sock *)arg;
 	FILE *fd = fopen("cwnd.csv", "w");
+	fprintf(fd, "time,cwnd\n");
 	double i = 0;
 	while (tsk->state != TCP_TIME_WAIT && tsk->parent == NULL) {
 		usleep(100);
