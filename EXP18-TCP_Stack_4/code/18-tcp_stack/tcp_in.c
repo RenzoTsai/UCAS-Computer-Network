@@ -74,7 +74,7 @@ void handle_recv_data(struct tcp_sock *tsk, struct tcp_cb *cb) {
 	//printf("handle recv data\n");
 	add_recv_ofo_buf_entry(tsk, cb);
 	put_recv_ofo_buf_entry_to_ring_buf(tsk);
-	//tcp_send_control_packet(tsk, TCP_ACK);
+	//tcp_send_control_packet(tsk, TCP_ACK); -> put into put_recv_ofo_buf_entry_to_ring_buf(tsk);
 	tsk->snd_una = (greater_than_32b(cb->ack, tsk->snd_una))?cb->ack :tsk->snd_una;
 	tcp_update_retrans_timer(tsk);
 	
@@ -187,7 +187,7 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 	printf("flags: 0x%x\n",tcp->flags);
 	printf("state: %s\n",tcp_state_to_str(tsk->state));
 	printf("rcv_nxt:%u, ack:%u, seq:%u, len:%d\n", tsk->rcv_nxt, cb->ack, cb->seq, cb->pl_len);
-	tsk->adv_wnd = cb->rwnd;
+	// tsk->adv_wnd = cb->rwnd;
 
 	if (tcp->flags & TCP_RST) {
 		tcp_sock_close(tsk);
@@ -211,9 +211,6 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 			delete_send_buffer_entry(tsk, cb->ack);
 			tcp_unset_retrans_timer(tsk);
 			tcp_set_state(tsk, TCP_ESTABLISHED);
-			// tsk->nr_state = TCP_OPEN;
-			// tsk->cwnd = 1;
-			// tsk->ssthresh = 16;
 			tcp_send_control_packet(tsk, TCP_ACK);	
 			wake_up(tsk->wait_connect);	
 		}
@@ -252,7 +249,6 @@ void tcp_process(struct tcp_sock *tsk, struct tcp_cb *cb, char *packet)
 				tsk->snd_una = cb->ack;
 				tcp_update_window_safe(tsk, cb);
 				tcp_update_retrans_timer(tsk);
-				//delete_send_buffer_entry(tsk, cb->ack);
 				tcp_new_reno_process(tsk, cb, packet);
 				wake_up(tsk->wait_send);
 			} else {

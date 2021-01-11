@@ -428,7 +428,6 @@ void send_data(struct tcp_sock *tsk, char *buf, int len) {
 }
 
 int is_allow_to_send (struct tcp_sock *tsk) {
-	//tsk->snd_wnd = min(tsk->adv_wnd, tsk->cwnd*MSS);
 	int inflight = (tsk->snd_nxt - tsk->snd_una)/MSS - tsk->dupacks;
 	return max(tsk->snd_wnd / MSS - inflight, 0);
 }
@@ -443,7 +442,6 @@ int tcp_sock_write(struct tcp_sock *tsk, char *buf, int len) {
 	while (len > 0) {
 		single_len = min(len, 1514 - ETHER_HDR_SIZE - IP_BASE_HDR_SIZE - TCP_BASE_HDR_SIZE);
 		send_data(tsk, buf + offset, single_len);
-		//if (tsk->snd_wnd <= 0) {
 		while (is_allow_to_send(tsk) == 0) {
 			sleep_on(tsk->wait_send);
 		}
@@ -540,6 +538,7 @@ int put_recv_ofo_buf_entry_to_ring_buf(struct tcp_sock *tsk) {
 		if (seq == entry->seq) {
 			seq += entry->len;
 			tsk->rcv_nxt = seq;
+			tsk->rcv_wnd = max(ring_buffer_free(tsk->rcv_buf) - entry->len, 0);
 			tcp_send_control_packet(tsk, TCP_ACK);
 			while(entry->len > ring_buffer_free(tsk->rcv_buf)) {
 				sleep_on(tsk->wait_recv);
