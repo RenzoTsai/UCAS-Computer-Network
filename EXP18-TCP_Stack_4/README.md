@@ -1,30 +1,30 @@
 [TOC]
 
-# 网络传输机制实验（三）
+# 网络传输机制实验（四）
 
-2021年1月6日
+2021年1月11日
 
 [蔡润泽](https://github.com/RenzoTsai)
 
-[本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP17-TCP_Stack_3)
+[本实验 `Github` 地址](https://github.com/RenzoTsai/UCAS-Computer-Network/tree/master/EXP18-TCP_Stack_4)
 
 ## 实验内容
 
-支持TCP可靠数据传输
+- TCP拥塞控制机制
 
-- 网络丢包
+	- TCP拥塞控制状态迁移
 
-- 超时重传机制
+	- TCP拥塞控制机制
 
-- 有丢包场景下的连接建立和断开
+		- 数据包发送
 
-- 发送队列和接收队列
+		- 拥塞窗口调整
 
-- 超时定时器实现
+		- 重传数据包
+
+- TCP拥塞控制机制实现
 
 ## 实验步骤
-
-- 修改tcp_apps.c(以及tcp_stack.py)，使之能够收发文件
 
 - 执行create_randfile.sh，生成待传输数据文件client-input.dat
 
@@ -46,209 +46,186 @@
 
 - 使用md5sum比较两个文件是否完全相同
 
-- 使用tcp_stack.py替换其中任意一端，对端都能正确收发数据
+- 记录h2中每次cwnd调整的时间和相应值，呈现到二维坐标图中
 
 ## 设计思路
 
-- 每个连接维护一个超时重传定时器
+### New Reno方法拥塞控制状态机的实现
 
-- 定时器管理
+根据TCP拥塞控制状态迁移图，设计状态机的跳转。
 
-	* 当发送一个带数据/SYN/FIN的包，如果定时器是关闭的，则开启并设置时间为200ms
+TCP初始状态为`OPEN`。
 
-	* 当ACK确认了部分数据，重启定时器，设置时间为200ms
+#### 若收到新的ACK
 
-	* 当ACK确认了所有数据/SYN/FIN，关闭定时器
+- 当TCP处于`DISORDER`状态时，则跳转回初始状态`OPEN`。
 
-- 触发定时器后
+- 当TCP处在`LOSS`状态时，若收到的ACK大于切换到`LOSS`状态时的snd_nxt时，跳转回OPEN。
 
-	* 重传第一个没有被对方连续确认的数据/SYN/FIN
+- 当TCP处在`RECOVERY`状态时，若收到的ACK大于切换到`RECOVERY`状态时的snd_nxt时，跳转回OPEN。
 
-	* 定时器时间翻倍，记录该数据包的重传次数
+#### 若收到重复ACK
 
-	* 当一个数据包重传3次，对方都没有确认，关闭该连接(RST)
+- 当TCP处在`OPEN`状态下，收到重复ACK时，`tsk->dupacks`加1，状态切换到`DISORDER`。
 
-### 超时重传实现
+- 当TCP处在`OPEN`状态下，收到重复ACK时，`tsk->dupacks`加1，当`tsk->dupacks = 3`时，状态切换到`RECOVERY`。
 
-- 在tcp_sock中维护定时器`struct tcp_timer retrans_timer`。
+### 拥塞控制
 
-- 当开启定时器时，将retrans_timer放到timer_list中。
+#### TCP拥塞窗口增大
 
-- 关闭定时器时，将retrans_timer从timer_list中移除。
+- 慢启动（Slow Start）
 
-- 定时器扫描，每10ms扫描一次定时器队列，重传定时器的值为200ms * 2^N。
+	- 对方每确认一个报文段，cwnd增加1MSS，直到cwnd超过ssthresh值
 
-#### `tcp_set_retrans_timer`、`tcp_update_retrans_timer`、tcp_unset_retrans_timer 函数
+	- 经过1个RTT，前一个cwnd的所有数据被确认后， cwnd大小翻倍
 
-分别负责定时器的设置、更新以及删除。
+- 拥塞避免（Congestion Avoidance）
 
-#### `tcp_scan_retrans_timer_list` 函数
+	- 对方每确认一个报文段，cwnd增加(1 MSS)/CWND  ∗ 1MSS  
 
-该函数负责扫描符合条件的定时器，若超时，则判断是否需要重传。
-
-若没有超过重传次数上界（本设计中设计为5），则调用`retrans_send_buffer_packet`函数，重传发送队列snd_buffer中第一个数据包。
-
-#### `retrans_send_buffer_packet` 函数
-
-负责重传send buffer中第一个数据包。
-
-### 发送队列维护
-
-- 所有未确认的数据/SYN/FIN包，在收到其对应的ACK之前，都要放在发送队列snd_buffer中，以备后面可能的重传。
-
-- 发送新的数据时，放到snd_buffer队尾，打开定时器。
-
-上述两步在本设计中通过修改tcp_out.c中的相关函数实现。
-
-- 收到新的ACK，将snd_buffer中已经确认的数据包移除，并更新定时器。 该步骤通过在`tcp_process` 函数修改相关状态下的处理流程，从而被调用。
-
-- 重传定时器触发时，重传snd_buffer中第一个数据包，定时器数值翻倍。
-
-#### `add_send_buffer_entry`、`alloc_send_buffer_entry` 函数
-
-`alloc_send_buffer_entry`负责创建一个buffer项，并在`add_send_buffer_entry`添加到snd_buffer队尾。
+	- 经过1个RTT，前一个cwnd的所有数据被确认后， cwnd增加1 MSS
 
 具体实现如下：
 
 ```c
-tcp_send_buffer_entry_t * alloc_send_buffer_entry(char *packet, int len) {
-	tcp_send_buffer_entry_t * entry = (tcp_send_buffer_entry_t *)malloc(sizeof(tcp_send_buffer_entry_t));
-	bzero(entry, sizeof(tcp_send_buffer_entry_t));
-	entry->packet = (char *)malloc(len);
-	memcpy((char*)entry->packet, packet, len);
-	entry->len = len;
-	return entry;
-}
-
-void add_send_buffer_entry(struct tcp_sock *tsk, char *packet, int len) {
-	tcp_send_buffer_entry_t * entry = alloc_send_buffer_entry(packet, len);
-	list_add_tail(&entry->list, &tsk->send_buf);
-}
-```
-
-其中，`tcp_send_buffer_entry_t`的数据结构如下：
-
-```c
-typedef struct {
-	struct list_head list;
-	char * packet;
-	int len;
-} tcp_send_buffer_entry_t;
-```
-
-#### `delete_send_buffer_entry` 函数
-
-该函数负责移除已确认的发送数据包，具体实现如下：
-
-```c
-void delete_send_buffer_entry(struct tcp_sock *tsk, u32 ack) {
-	//printf("Delete a send_buffer_entry here.\n");
-	tcp_send_buffer_entry_t * entry, * entry_q;
-	list_for_each_entry_safe(entry, entry_q, &tsk->send_buf, list) {
-		struct tcphdr *tcp = packet_to_tcp_hdr(entry->packet);
-		u32 seq = ntohl(tcp->seq);
-		if (less_than_32b(seq, ack)) {
-			list_delete_entry(&entry->list);
-			free(entry->packet);
-			free(entry);
-		}
+void update_cwnd(struct tcp_sock *tsk) {
+	if ((int)tsk->cwnd < tsk->ssthresh) {
+		tsk->cwnd ++;
+	} else {
+		tsk->cwnd += 1.0/tsk->cwnd;
 	}
 }
 ```
 
-### 接收队列维护
+注：TSK为实现方便，将cwnd的变量类型设为了`float`。
 
-- 数据接收方需要维护两个队列
+#### TCP拥塞窗口减小
 
-	* 已经连续收到的数据，放在rcv_ring_buffer中供app读取。
+- 快重传（Fast Retransmission）
 
-	* 收到不连续的数据，放到rcv_ofo_buffer队列中。
+	- ssthresh减小为当前cwnd的一半：ssthresh <- cwnd / 2
 
-- TCP属于发送方驱动传输机制
+	- 新拥塞窗口值cwnd <- 新的ssthresh
 
-	* 接收方只负责在收到数据包时回复相应ACK。
+- 超时重传（Retransmission Timeout）
 
-- 收到不连续的数据包时
+	- Ssthresh减小为当前cwnd的一半：ssthresh <- cwnd / 2
 
-	* 放在rcv_ofo_buffer队列，如果队列中包含了连续数据，则将其移到rcv_ring_buffer中。
+	- 拥塞窗口值cwnd减为1 MSS
 
-#### `add_recv_ofo_buf_entry` 函数
+在具体实现减半操作时时，每收到一个ACK，cwnd的值减少`0.5`。
 
-该函数负责将收到的不连续数据放到rcv_ofo_buffer队列中，具体实现如下：
+#### TCP拥塞窗口不变
 
-```c
-void add_recv_ofo_buf_entry(struct tcp_sock *tsk, struct tcp_cb *cb) {
-	rcv_ofo_buf_entry_t * latest_ofo_entry = (rcv_ofo_buf_entry_t *)malloc(sizeof(rcv_ofo_buf_entry_t));
-	latest_ofo_entry->seq = cb->seq;
-	latest_ofo_entry->len = cb->pl_len;
-	latest_ofo_entry->data = (char*)malloc(cb->pl_len);
-	memcpy(latest_ofo_entry->data, cb->payload, cb->pl_len);
-	rcv_ofo_buf_entry_t * entry, *entry_q;
-	list_for_each_entry_safe (entry, entry_q, &tsk->rcv_ofo_buf, list) {
-		if(less_than_32b(latest_ofo_entry->seq , entry->seq)) {
-			list_add_tail(&latest_ofo_entry->list, &entry->list);
-			return;
-		}
-	}
-	list_add_tail(&latest_ofo_entry->list, &tsk->rcv_ofo_buf);
-}
-```
+- 快恢复（Fast Recovery）
 
-其中，`rcv_ofo_buf_entry_t`的数据结构如下：
+	- 进入：在快重传之后立即进入
 
-```c
-typedef struct {
-	struct list_head list;
-	char * data;
-	int len;
-	int seq;
-} rcv_ofo_buf_entry_t;
-```
+	- 退出：
 
-#### `put_recv_ofo_buf_entry_to_ring_buf` 函数
+		- 当对方确认了进入FR前发送的所有数据时，进入Open状态
 
-该函数负责将已经连续收到的数据，放在rcv_ring_buffer中供app读取，具体实现如下：
+		- 当触发RTO后，进入Loss状态
+
+	- 在FR内，收到一个ACK：
+
+		- 若该ACK没有确认新数据，则说明inflight减一，cwnd允许发送一个新数据包
+
+		- 若该ACK确认了新数据
+
+		- 如果是Partial ACK，则重传对应的数据包
+
+		- 如果是Full ACK，则退出FR阶段
+
+具体实现如下：
 
 ```c
-int put_recv_ofo_buf_entry_to_ring_buf(struct tcp_sock *tsk) {
-	u32 seq = tsk->rcv_nxt;
-	rcv_ofo_buf_entry_t * entry, * entry_q;
-	list_for_each_entry_safe(entry, entry_q, &tsk->rcv_ofo_buf, list) {
-		if (seq == entry->seq) {
-			while(entry->len > ring_buffer_free(tsk->rcv_buf)) {
-				sleep_on(tsk->wait_recv);
-			}
-			write_ring_buffer(tsk->rcv_buf, entry->data, entry->len);
-			wake_up(tsk->wait_recv);
-			seq += entry->len;
-			tsk->rcv_nxt = seq;
-			list_delete_entry(&entry->list);
-			free(entry->data);
-			free(entry);
-		} else if (less_than_32b(seq, entry->seq)) { 
-			break;
+if (tsk->nr_state == TCP_RECOVERY) {
+	if (isNewAck) {
+		if (tsk->cwnd > tsk->ssthresh && tsk->cwnd_flag == 0) {
+			tsk->cwnd -= 0.5;
 		} else {
-			return -1;
+			tsk->cwnd_flag = 1;
+		}
+		if (cb->ack < tsk->recovery_point) {
+			retrans_send_buffer_packet(tsk);
+		} else {
+			tsk->nr_state = TCP_OPEN;
+			tsk->dupacks = 0;
+		}
+	} else {
+		tsk->dupacks ++;
+		if (tsk->cwnd > tsk->ssthresh && tsk->cwnd_flag == 0) {
+			tsk->cwnd -= 0.5;
+		} else {
+			tsk->cwnd_flag = 1;
 		}
 	}
-	return 0;
 }
 ```
+
+上述函数中有标志位`cwnd_flag`，当flag为`0`时说明此时cwnd还需要继续下降。
+
+#### 修改发送函数已经更新窗口
+
+发送数据包时，需要根据发送窗口大小进行判断，本设计中引入了函数，设计如下：
+
+```c
+int is_allow_to_send (struct tcp_sock *tsk) {
+	int inflight = (tsk->snd_nxt - tsk->snd_una)/MSS - tsk->dupacks;
+	return max(tsk->snd_wnd / MSS - inflight, 0);
+}
+```
+
+若该函数的返回值为`0`，则`sleep_on(tsk->wait_send);`
+
+另外对于`tcp_update_window`进行了如下修改：
+
+```c
+static inline void tcp_update_window(struct tcp_sock *tsk, struct tcp_cb *cb) {
+	u16 old_snd_wnd = tsk->snd_wnd;
+	tsk->snd_wnd = min(cb->rwnd, tsk->cwnd * MSS);
+	if ((int)old_snd_wnd <= 0) {
+		wake_up(tsk->wait_send);
+	}
+}
+```
+
+（注：若tsk->adv_wnd之前收到ACK时被赋成cb->rwnd的值，此处的cb->rwnd被替换成tsk->adv_wnd也行）
+
+### 统计CWND的变化
+
+PPT中建议每当值发生改变时，就记录CWND的变化，但是这样需要在TSK中新增两个变量用来记录时间和FILE的句柄。因此在本设计中改为每间隔一段时间，就扫描当前CWND的值。另外需要注意的是，由于本实验中存在两个tsk，因此统计值的时候需要指定统计客户端的cwnd即tsk->parent等于NULL的tsk的CWND。
+
+另外数据处理用了ipynb实现。
+
+### 修复之间实验的问题
+
+#### 问题一
+
+补充了流量控制，在之前的设计中，忘记改变tsk->rwnd的值，让他一直保持在初始默认状态，新设计中将其改为了，当写ring_buffer时，将ring_buffer的剩余空间赋值给tsk->rwnd。
+
+#### 问题二
+
+之前实验三中传输时间较慢，我以为是因为没有实现快重传。在本次实验实现了快重传后，发现TCP依旧总是需要超时重传，查看代码发现，之前retrans定时器set和update有问题，其time_out并没有赋值时，而是在编辑器自动补全时，变成了给time_wait的timeout赋值。这个问题在本次代码设计中被修复。
 
 ## 结果验证
 
-由于实现简单重传机制非常耗时，此实验将传输文本大小缩短到了500KB，另外为了验证本设计的鲁棒性，丢包率增大到了10%。
+本次实验传输的数据大小为`1,350,880B`，设置的丢包率为`5%`。
 
-本次实验的结果如下：
+本次实验的传输结果如下：
 
-![result](/EXP17-TCP_Stack_3/assets/result.jpg)
+![result](/EXP18-TCP_Stack_4/assets/result.jpg)
 
 上图可知，可知本次实验结果符合预期，客户端发送的文件与服务器端接受的文件一致。
 
-## 遇到的问题
+CWND的变化曲线如下：
 
-本次实验中需要更进一步的理清TCP传输参数之间的关系。除了TCP重传部分设计比较耗时外，本次实验还存在一个问题（该问题上次实验应该就出现了）：
+![cwnd](/EXP18-TCP_Stack_4/assets/cwnd.jpg)
 
-在设计tcp_app.c的server端时，由于接收端不清楚传输文件的总大小，因此无法准确的判断什么时候需要退出while循环。若不直接退出while循环，则不能正常进行fclose，这样会导致最后一段写入file的数据丢失。为了解决这一问题，本设计设计成若单词传输的大小<1460（单个数据包的最大数据长度），则退出循环。但这样的设计还是可能会导致一定的问题，若传输的总数据长度为1460的整数倍，则还是无法识别最后一个包的到来。
+与预期结果存在两点小的差异，原因如下：
 
-若要从根本上解决这一问题，应该是应用层的设计需要考虑的，例如一开始就传给对端接下来要传输数据的总长度（类似于HTTP协议的实现）。
+- 不够平滑是因为本设计中改为每间隔一段时间，就扫描当前CWND的值，而扫描的时间间隔相比于CWND的变化稍大。
+
+- 由于为测试该设计的鲁棒性，本实验环境的丢包率设置为5%，这一数字相对较大，导致需要超时重传的次数也相对增多，最终导致很多时间下CWND的大小接近于`1`。

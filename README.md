@@ -21,3 +21,27 @@ Build a network which contains switchs
 ### EXP06-STP
 
 Support Spanning Tree Protocol.
+
+### EXP07-Router
+
+Support Router's forwarding.
+
+### EXP10-Bufferbloat
+
+A experiment to analyze Bufferbloat.
+
+### EXP11-Lookup
+
+Support Efficient Router Lookup.
+
+### EXP12-Lookup
+
+Support mOSPF Protocol.
+
+### EXP13-NAT
+
+Support NAT.
+
+### EXP15-18
+
+Support TCP.
