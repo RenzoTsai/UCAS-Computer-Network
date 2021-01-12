@@ -67,7 +67,7 @@ enum tcp_state { TCP_CLOSED, TCP_LISTEN, TCP_SYN_RECV, TCP_SYN_SENT, \
 	TCP_FIN_WAIT_2, TCP_CLOSING, TCP_TIME_WAIT };
 
 // tcp new reno states
-enum tcp_nr_state { TCP_OPEN, TCP_LOSS, TCP_DISORDER, TCP_RECOVERY, TCP_CWR, TCP_FR};
+enum tcp_nr_state { TCP_OPEN, TCP_LOSS, TCP_DISORDER, TCP_RECOVERY, TCP_CWR};
 
 static inline struct tcphdr *packet_to_tcp_hdr(char *packet)
 {
