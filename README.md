@@ -45,3 +45,5 @@ Support NAT.
 ### EXP15-18
 
 Support TCP.
+
+(Noted: EXP15-17 may exist some flaws, and the flaws are updated in EXP18.)
